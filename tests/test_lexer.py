@@ -1,6 +1,6 @@
-from smickelscript import lexer
 from typing import List
 from functools import reduce
+from smickelscript import lexer
 
 
 def require_all_equal(sources: List[str]):

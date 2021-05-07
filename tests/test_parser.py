@@ -32,12 +32,14 @@ def test_hello_world():
             lexer.IdentifierToken(2, "main"),
             [],
             lexer.TypeToken(2, "void"),
-            [
-                parser.FuncCallToken(
-                    lexer.IdentifierToken(3, "println"),
-                    [parser.LiteralToken(lexer.StringLiteralToken(3, "Hello World"))],
-                )
-            ],
+            parser.ScopeWithBody(
+                [
+                    parser.FuncCallToken(
+                        lexer.IdentifierToken(3, "println"),
+                        [parser.LiteralToken(lexer.StringLiteralToken(3, "Hello World"))],
+                    )
+                ]
+            ),
         )
     ]
 
@@ -73,3 +75,30 @@ def test_variable_move():
     hello(b);
     """
     ast = parse(src)
+
+
+def test_invalid_func():
+    # No opening and closing brackets, {}
+    src = "func hello(txt: string) println(txt);"
+    with pytest.raises(parser.UnexpectedTokenException):
+        ast = parse(src)
+
+
+def test_multi_scope():
+    src = """
+    func main() {
+        var a = "Initial";
+        println(a);
+        {
+            var a = "Second";
+            println(a);
+        }
+        {
+            var a = "Third";
+            println(a);
+        }
+        println(a);
+    }
+    """
+    ast = parse(src)
+    pass

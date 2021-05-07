@@ -53,9 +53,9 @@ class LiteralToken(ParserToken):
 
 
 class FuncCallToken(ParserToken):
-    def __init__(self, identifier, args):
+    def __init__(self, identifier: lexer.IdentifierToken, args: List = None):
         self.identifier = identifier
-        self.args = args
+        self.args = args or []
 
 
 class ConditionToken(ParserToken):
@@ -115,6 +115,25 @@ class AssignVariableToken(ParserToken):
         self.value = value
 
 
+# TODO: Find a better name for this
+class ScopeWithBody(ParserToken):
+    def __init__(self, body):
+        self.body = body
+
+
+def load_file(filename: str):
+    with open(filename) as f:
+        tokens = lexer.tokenize_file(filename)
+        ast = parse_tokens(tokens)
+        return ast
+
+
+def load_source(source: str):
+    tokens = lexer.tokenize_str(source)
+    ast = parse_tokens(tokens)
+    return ast
+
+
 def parse_tokens(tokens: List[lexer.LexerToken], until_token_of_type=None):
     if len(tokens) == 0:
         return []
@@ -130,21 +149,21 @@ def parse_tokens(tokens: List[lexer.LexerToken], until_token_of_type=None):
         return [ast]
 
 
-def parse_scope(tokens: List[lexer.LexerToken], ast=None):
-    if ast == None:
-        ast = []
+def parse_scope(tokens: List[lexer.LexerToken], statements=None):
+    if statements == None:
+        statements = []
         _, tokens = eat_one(tokens, lexer.ScopeOpenToken)
 
     end_scope_token, tokens = eat_one(tokens, lexer.ScopeCloseToken, False)
     if end_scope_token:
-        return ast, tokens
+        return ScopeWithBody(statements), tokens
     else:
         token, tokens = parse_statement(tokens)
 
         # # Not every statement needs to end with a semicolon.
         # if type(token) not in no_semicolon_after_these:
         #     _, tokens = eat_one(tokens, lexer.SemiToken)
-        return parse_scope(tokens, ast + [token])
+        return parse_scope(tokens, statements + [token])
 
 
 def parse_statement(tokens: List[lexer.LexerToken]):
@@ -339,7 +358,7 @@ def eat_one(tokens, of_type: Type, required=True, with_value=None):
     if len(tokens) > 0 and isinstance(tokens[0], of_type):
         if with_value and tokens[0].value != with_value:
             if required:
-                raise ParserException(
+                raise UnexpectedTokenException(
                     "Error on line {}. Expected a token with value '{}', but found a token with value '{}'.".format(
                         tokens[0].line_nr, with_value, tokens[0].value
                     )
@@ -347,7 +366,7 @@ def eat_one(tokens, of_type: Type, required=True, with_value=None):
             return None, tokens
         return tokens[0], tokens[1:]
     if required:
-        raise ParserException(
+        raise UnexpectedTokenException(
             "Error on line {}. Expected token of type '{}', but found a token of type '{}'.".format(
                 tokens[0].line_nr, of_type.__name__, type(tokens[0]).__name__
             )
@@ -361,6 +380,7 @@ token_parsers = {
     lexer.StringLiteralToken: parse_literal,
     lexer.NumberLiteralToken: parse_literal,
     lexer.CommentToken: parse_comment,
+    lexer.ScopeOpenToken: parse_scope,
 }
 
 keyword_parsers = {
