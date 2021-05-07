@@ -2,7 +2,6 @@ import os
 import re
 import json
 import types
-import jsonpickle
 import itertools
 from enum import Enum, unique
 from functools import reduce
@@ -14,7 +13,7 @@ class LexerException(Exception):
     pass
 
 
-class UnexpectedCharacterException(Exception):
+class UnexpectedCharacterException(LexerException):
     pass
 
 
@@ -29,6 +28,11 @@ class LexerToken:
 
     def __repr__(self):
         return "<{}>".format(type(self).__name__)
+
+    def __eq__(self, value):
+        if hasattr(self, "__dict__") and hasattr(value, "__dict__"):
+            return vars(self) == vars(value)
+        return super().__eq__(value)
 
 
 class KeywordToken(LexerToken):
@@ -197,6 +201,12 @@ def tokenize_file(filename: str):
         )
 
 
+def tokenize_str(txt: str):
+    return reduce(
+        list.__add__, map(lambda x: tokenize(x[1] + "\n", x[0] + 1), enumerate(txt.split("\n")))
+    )
+
+
 def tokenize(txt: str, line_nr=-1, tokens: List[LexerToken] = None):
     if tokens == None:
         tokens = []
@@ -229,14 +239,14 @@ def parse_token(txt: str, line_nr=-1):
     if txt[0] in [x[0] for x in comparison_operator_map]:
         return parse_operator(txt, line_nr)
 
-    # Check if this is an arithmetic operator
-    if txt[0] in arithmetic_operator_map:
-        return arithmetic_operator_map[txt[0]](line_nr), txt[1:]
-
     # Check if this is a number literal
     if txt[0].isdigit() or (txt[0] == "-" and txt[1].isdigit()):
         num, txt = eat_number(txt, line_nr)
         return NumberLiteralToken(line_nr, num), txt
+
+    # Check if this is an arithmetic operator
+    if txt[0] in arithmetic_operator_map:
+        return arithmetic_operator_map[txt[0]](line_nr), txt[1:]
 
     token, txt = eat_word(txt)
 
@@ -306,7 +316,9 @@ def eat_number(txt: str, line_nr=-1, eaten: str = None, first_digit=True, has_de
         eaten = ""
 
     # Continue eating when the char is a number, or it is a decimal point.
-    if txt[0].isdigit() or (not first_digit and txt[0] == ".") or (first_digit and txt[0] == "-"):
+    if len(txt) > 0 and (
+        txt[0].isdigit() or (not first_digit and txt[0] == ".") or (first_digit and txt[0] == "-")
+    ):
         if txt[0] == ".":
             if has_decimal_point == True:
                 raise LexerException(
@@ -315,7 +327,6 @@ def eat_number(txt: str, line_nr=-1, eaten: str = None, first_digit=True, has_de
             has_decimal_point = True
 
         return eat_number(txt[1:], line_nr, eaten + txt[0], False, has_decimal_point)
-    # Continue eating
     else:
         return eaten, txt
 
@@ -356,12 +367,16 @@ def expect_character(txt: str, expected: str, line_nr=-1, _skip_whitespaces=Fals
         )
 
 
+def print_tokens(tokens):
+    print(json.dumps(tokens, indent=4, cls=LexerJsonEncoder))
+
+
 if __name__ == "__main__":
 
     def print_tokenized_file(filename: str):
         tokens = tokenize_file(filename)
         print("Lexing {}".format(filename))
-        print(json.dumps(tokens, indent=2, cls=LexerJsonEncoder))
+        print_tokens(tokens)
         print()
 
-    [print_tokenized_file("../code/" + file) for file in os.listdir("../code")]
+    [print_tokenized_file("../example/" + file) for file in os.listdir("../example")]

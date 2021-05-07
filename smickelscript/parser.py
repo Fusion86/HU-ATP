@@ -1,13 +1,24 @@
 import os
 import re
 import json
-import lexer
 import types
-import jsonpickle
 from enum import Enum, unique
 from functools import reduce
 from typing import List, Tuple, Union, Iterable, Type
 from pprint import pprint
+from smickelscript import lexer
+
+
+class ParserException(Exception):
+    pass
+
+
+class UnexpectedTokenException(ParserException):
+    pass
+
+
+class UnexpectedKeywordException(ParserException):
+    pass
 
 
 class ParserJsonEncoder(json.JSONEncoder):
@@ -18,6 +29,11 @@ class ParserJsonEncoder(json.JSONEncoder):
 class ParserToken:
     def __repr__(self):
         return "<{}>".format(type(self).__name__)
+
+    def __eq__(self, value):
+        if hasattr(self, "__dict__") and hasattr(value, "__dict__"):
+            return vars(self) == vars(value)
+        return super().__eq__(value)
 
 
 class FuncParameterToken(ParserToken):
@@ -103,8 +119,8 @@ def parse_tokens(tokens: List[lexer.LexerToken], until_token_of_type=None):
     if len(tokens) == 0:
         return []
 
-    if until_token_of_type and type(tokens[0]) == until_token_of_type:
-        return tokens
+    # if until_token_of_type and type(tokens[0]) == until_token_of_type:
+    #     return tokens
 
     ast, tokens = parse_statement(tokens)
 
@@ -125,9 +141,9 @@ def parse_scope(tokens: List[lexer.LexerToken], ast=None):
     else:
         token, tokens = parse_statement(tokens)
 
-        # Not every statement needs to end with a semicolon.
-        if type(token) not in no_semicolon_after_these:
-            _, tokens = eat_one(tokens, lexer.SemiToken)
+        # # Not every statement needs to end with a semicolon.
+        # if type(token) not in no_semicolon_after_these:
+        #     _, tokens = eat_one(tokens, lexer.SemiToken)
         return parse_scope(tokens, ast + [token])
 
 
@@ -135,12 +151,14 @@ def parse_statement(tokens: List[lexer.LexerToken]):
     token_type = type(tokens[0])
     if token_type in token_parsers:
         ast, tokens = token_parsers[token_type](tokens)
+
+        # Not every statement needs to end with a semicolon.
+        _, tokens = eat_one(tokens, lexer.SemiToken, False)
+
         return ast, tokens
     else:
-        raise Exception(
-            "Error on line {}. No parser available for token of type '{}'.".format(
-                tokens[0].line_nr, token_type
-            )
+        raise UnexpectedTokenException(
+            "Error on line {}. Unexpected token '{}'.".format(tokens[0].line_nr, token_type)
         )
 
 
@@ -151,10 +169,8 @@ def parse_keyword_token(tokens: List[lexer.LexerToken]):
     if keyword in keyword_parsers:
         return keyword_parsers[keyword](tokens)
     else:
-        raise Exception(
-            "Error on line {}. No parser available for keyword '{}'.".format(
-                tokens[0].line_nr, keyword
-            )
+        raise UnexpectedKeywordException(
+            "Error on line {}. Unexpected keyword '{}'.".format(tokens[0].line_nr, keyword)
         )
 
 
@@ -202,7 +218,7 @@ def parse_if_statement(tokens):
     # Parse else statement, if it exists
     else_token, tokens = eat_one(tokens, lexer.KeywordToken, False, "else")
     if else_token:
-        raise NotImplementedError()
+        raise NotImplementedError("'else' keywords are currently not implemented.")
 
     return IfStatementToken(condition, true_body), tokens
 
@@ -268,7 +284,7 @@ def parse_typehint(tokens, required=False, default=None):
     if typehint_token:
         return eat_one(tokens, lexer.TypeToken)
     elif required:
-        raise Exception(
+        raise ParserException(
             "Error on line {}. A typehint is required, but not found.".format(tokens[0].line_nr)
         )
     else:
@@ -320,10 +336,10 @@ def parse_arguments(tokens, args=None):
 
 
 def eat_one(tokens, of_type: Type, required=True, with_value=None):
-    if isinstance(tokens[0], of_type):
+    if len(tokens) > 0 and isinstance(tokens[0], of_type):
         if with_value and tokens[0].value != with_value:
             if required:
-                raise Exception(
+                raise ParserException(
                     "Error on line {}. Expected a token with value '{}', but found a token with value '{}'.".format(
                         tokens[0].line_nr, with_value, tokens[0].value
                     )
@@ -331,7 +347,7 @@ def eat_one(tokens, of_type: Type, required=True, with_value=None):
             return None, tokens
         return tokens[0], tokens[1:]
     if required:
-        raise Exception(
+        raise ParserException(
             "Error on line {}. Expected token of type '{}', but found a token of type '{}'.".format(
                 tokens[0].line_nr, of_type.__name__, type(tokens[0]).__name__
             )
@@ -358,7 +374,12 @@ keyword_parsers = {
     "while": parse_while,
 }
 
-no_semicolon_after_these = [IfStatementToken, WhileStatementToken, lexer.CommentToken]
+# no_semicolon_after_these = [IfStatementToken, WhileStatementToken, lexer.CommentToken]
+
+
+def print_ast(ast):
+    print(json.dumps(ast, indent=4, cls=ParserJsonEncoder))
+
 
 if __name__ == "__main__":
 
@@ -366,6 +387,7 @@ if __name__ == "__main__":
         tokens = lexer.tokenize_file(filename)
         ast = parse_tokens(tokens)
         print("Printing AST for {}".format(filename))
-        print(json.dumps(ast, indent=4, cls=ParserJsonEncoder))
+        print_ast(ast)
+        print()
 
-    [print_parsed_file("../code/" + file) for file in os.listdir("../code")]
+    [print_parsed_file("../example/" + file) for file in os.listdir("../example")]
