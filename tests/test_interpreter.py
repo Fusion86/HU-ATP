@@ -137,6 +137,20 @@ def test_return_comparison_statement():
     run_source(src)
 
 
+def test_return_bool_var():
+    src = """
+    func main() { var a: bool = true; return a; }
+    """
+    run_source(src)
+
+
+def test_return_bool_literal():
+    src = """
+    func main() { return true; }
+    """
+    run_source(src)
+
+
 def test_arithmetic_statement():
     src = """
     // Or arithmetic statements.
@@ -152,6 +166,13 @@ def test_invalid_type():
     """
     with pytest.raises(interpreter.InvalidTypeException):
         run_source(src)
+
+
+def test_no_func_type():
+    src = """
+    func test(a) { }
+    func main() { println(test("String type")); }
+    """
 
 
 def test_odd_even():
@@ -229,3 +250,26 @@ def test_string_concat_func():
     """
     run_source(src, stdout=stdout_cap)
     assert captured_output == "15\n"
+
+
+def test_exit_code():
+    src = "func main() { return 1; }"
+    res = run_source(src)
+    assert res == 1
+
+
+def test_exit_value():
+    src = 'func main() { return "Hello"; }'
+    res = run_source(src)
+    assert res == "Hello"
+
+
+def test_return_type():
+    src = 'func main(): string { return "Hello"; }'
+    run_source(src)
+
+
+def test_invalid_return_type():
+    src = 'func main(): number { return "Hello"; }'
+    with pytest.raises(interpreter.InvalidTypeException):
+        run_source(src)

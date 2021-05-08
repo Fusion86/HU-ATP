@@ -23,3 +23,7 @@ func incr_a() {
     a = a + 1;
 }
 ```
+
+## Types
+
+All typehints are optional, but when they are given they will be enforced. If the typehints are omitted they will be guessed.

@@ -389,6 +389,7 @@ token_parsers = {
     lexer.IdentifierToken: parse_identifier_action,
     lexer.StringLiteralToken: parse_literal,
     lexer.NumberLiteralToken: parse_literal,
+    lexer.BoolLiteralToken: parse_literal,
     lexer.CommentToken: parse_comment,
     lexer.ScopeOpenToken: parse_scope,
 }

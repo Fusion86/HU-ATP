@@ -5,6 +5,7 @@ from smickelscript import lexer, parser
 
 
 T = TypeVar("T")
+SmickelVariableType = TypeVar("SmickelVariableType")
 
 
 class ProgramState:
@@ -37,13 +38,13 @@ class InvalidTypeException(SmickelRuntimeException):
 default_stdout = lambda x: print(x, end="")
 
 
-def run_program(ast, entrypoint="main", stdout=default_stdout):
+def run_program(ast, entrypoint="main", stdout=default_stdout) -> SmickelVariableType:
     func = find_func(ast, entrypoint)
 
     if func == None:
         raise EntrypointNotFoundException("Entrypoint '{}' not found.".format(entrypoint))
 
-    return execute_func(ast, func, ProgramState(), stdout)
+    return execute_func(ast, func, ProgramState(), stdout)[0]
 
 
 def run_source(source: str, entrypoint="main", stdout=default_stdout):
@@ -81,7 +82,7 @@ def execute_func_call(ast, statement: parser.FuncCallToken, state: ProgramState,
         para_names = map(lambda x: x.identifier.value, func.parameters)
 
         # Verify types
-        list(map(lambda x: verify_type(x[0], x[1]), zip(func.parameters, args)))
+        list(map(lambda x: verify_type(x[0].variable_type, x[1]), zip(func.parameters, args)))
 
         # Create new stack scope and push the arguments
         new_stack_layer = dict(zip(para_names, args))
@@ -104,7 +105,9 @@ def execute_noop(ast: List, token, state: ProgramState, stdout):
 
 
 def execute_func(ast: List, func: parser.FunctionToken, state: ProgramState, stdout):
-    return execute_scope(ast, func.body, state, stdout, False)
+    retval, state = execute_scope(ast, func.body, state, stdout, False)
+    verify_type(func.return_type, retval)
+    return retval, state
 
 
 def execute_scope(
@@ -143,7 +146,6 @@ def execute_scope(
         # Pop stack only if we also were the ones to create it.
         if create_new_stack_layer:
             state = ProgramState(state.stack[:-1])
-
         return retval, state
 
     return execute_scope(ast, scope, state, stdout, create_new_stack_layer, counter + 1)
@@ -166,7 +168,9 @@ def execute_identifier(ast: List, token: lexer.IdentifierToken, state: ProgramSt
     return get_var_value(token, state), state
 
 
-def execute_literal(ast: List, token: parser.LiteralToken, state: ProgramState, stdout):
+def execute_literal(
+    ast: List, token: parser.LiteralToken, state: ProgramState, stdout
+) -> Tuple[SmickelVariableType, ProgramState]:
     if type(token.value) == lexer.NumberLiteralToken:
         return int(token.value.value), state
     return token.value.value, state
@@ -262,7 +266,7 @@ def find_func(ast, func_name) -> parser.FunctionToken:
     )
 
 
-def get_var_value(token: lexer.IdentifierToken, state: ProgramState) -> T:
+def get_var_value(token: lexer.IdentifierToken, state: ProgramState) -> SmickelVariableType:
     def get_value(layer):
         if token.value in layer:
             return layer[token.value]
@@ -278,13 +282,13 @@ def get_var_value(token: lexer.IdentifierToken, state: ProgramState) -> T:
     return values[-1]
 
 
-def verify_type(param: parser.FuncParameterToken, value):
-    if param.variable_type.type_name == "number":
+def verify_type(type_token: lexer.TypeToken, value):
+    if type_token.type_name == "number":
         if type(value) != int:
-            raise InvalidTypeException(param.identifier.line_nr, int, type(value))
-    elif param.variable_type.type_name == "string":
+            raise InvalidTypeException(type_token.line_nr, int, type(value))
+    elif type_token.type_name == "string":
         if type(value) != str:
-            raise InvalidTypeException(param.identifier.line_nr, int, type(value))
+            raise InvalidTypeException(type_token.line_nr, int, type(value))
 
 
 statement_exec_map = {
