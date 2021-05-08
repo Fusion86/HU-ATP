@@ -1,5 +1,14 @@
 # SmickelScript
 
+Crappy programming language made for a school assignment. Heavily influenced by JavaScript/TypeScript.
+
+## TODO
+
+- [required] Allow interpreter to pass arguments to the entry point (e.g. main or own func)
+- Better error message when a function is missing a return statement (but a return typehint is given)
+- Print statement without newline?
+- Some interesting example code
+
 ## Numbers
 
 If a negative sign 'touches' a number it will always be interpreted as a negative number.

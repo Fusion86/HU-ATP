@@ -61,17 +61,23 @@ class IdentifierToken(ValueToken):
         super().__init__(line_nr, value)
 
 
-class StringLiteralToken(ValueToken):
+class LiteralToken(ValueToken):
+    def __init__(self, line_nr, value):
+        super().__init__(line_nr, value)
+        self.value = value
+
+
+class StringLiteralToken(LiteralToken):
     def __init__(self, line_nr, value):
         super().__init__(line_nr, value)
 
 
-class NumberLiteralToken(ValueToken):
+class NumberLiteralToken(LiteralToken):
     def __init__(self, line_nr, value):
         super().__init__(line_nr, value)
 
 
-class BoolLiteralToken(ValueToken):
+class BoolLiteralToken(LiteralToken):
     def __init__(self, line_nr, value):
         super().__init__(line_nr, value)
 

@@ -178,7 +178,7 @@ def parse_statement(tokens: List[lexer.LexerToken]):
     if token_type in token_parsers:
         ast, tokens = token_parsers[token_type](tokens)
 
-        # Not every statement needs to end with a semicolon.
+        # TODO: Not every statement needs to end with a semicolon.
         _, tokens = eat_one(tokens, lexer.SemiToken, False)
 
         return ast, tokens
@@ -202,8 +202,9 @@ def parse_keyword_token(tokens: List[lexer.LexerToken]):
         )
 
 
+# TODO: Rename this?
 def parse_identifier_action(tokens: List[lexer.LexerToken]):
-    token, tokens = eat_one(tokens, lexer.IdentifierToken)
+    token, tokens = eat_one(tokens, lexer.ValueToken)
 
     # What do we do with this identifier?
 
@@ -232,6 +233,10 @@ def parse_identifier_action(tokens: List[lexer.LexerToken]):
         operator, tokens = eat_one(tokens, lexer.OperatorToken)
         rhs, tokens = parse_statement(tokens)
         token = OperatorToken(token, operator, rhs)
+
+    # Is this just a ValueLiteral?
+    if isinstance(token, lexer.LiteralToken):
+        return LiteralToken(token), tokens
 
     # All statements should end with a semicolon.
     # _, tokens = eat_one(tokens, lexer.SemiToken)
@@ -284,8 +289,8 @@ def parse_while(tokens):
     return WhileStatementToken(condition, body), tokens
 
 
-def parse_literal(tokens):
-    return LiteralToken(tokens[0]), tokens[1:]
+# def parse_literal(tokens):
+#     return LiteralToken(tokens[0]), tokens[1:]
 
 
 def parse_comment(tokens):
@@ -387,9 +392,9 @@ def eat_one(tokens, of_type: Type, required=True, with_value=None):
 token_parsers = {
     lexer.KeywordToken: parse_keyword_token,
     lexer.IdentifierToken: parse_identifier_action,
-    lexer.StringLiteralToken: parse_literal,
-    lexer.NumberLiteralToken: parse_literal,
-    lexer.BoolLiteralToken: parse_literal,
+    lexer.StringLiteralToken: parse_identifier_action,
+    lexer.NumberLiteralToken: parse_identifier_action,
+    lexer.BoolLiteralToken: parse_identifier_action,
     lexer.CommentToken: parse_comment,
     lexer.ScopeOpenToken: parse_scope,
 }
