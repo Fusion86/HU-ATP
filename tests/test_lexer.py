@@ -78,7 +78,7 @@ def test_even():
         lexer.ArgumentsCloseToken,
         lexer.ScopeOpenToken,
         lexer.KeywordToken,
-        lexer.KeywordToken,
+        lexer.BoolLiteralToken,
         lexer.SemiToken,
         lexer.ScopeCloseToken,
         # return odd(n-1);

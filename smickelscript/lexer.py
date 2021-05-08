@@ -50,22 +50,30 @@ class TypeToken(LexerToken):
         self.type_name = type_name
 
 
-class IdentifierToken(LexerToken):
+class ValueToken(LexerToken):
     def __init__(self, line_nr, value):
         super().__init__(line_nr)
         self.value = value
 
 
-class StringLiteralToken(LexerToken):
+class IdentifierToken(ValueToken):
     def __init__(self, line_nr, value):
-        super().__init__(line_nr)
-        self.value = value
+        super().__init__(line_nr, value)
 
 
-class NumberLiteralToken(LexerToken):
+class StringLiteralToken(ValueToken):
     def __init__(self, line_nr, value):
-        super().__init__(line_nr)
-        self.value = value
+        super().__init__(line_nr, value)
+
+
+class NumberLiteralToken(ValueToken):
+    def __init__(self, line_nr, value):
+        super().__init__(line_nr, value)
+
+
+class BoolLiteralToken(ValueToken):
+    def __init__(self, line_nr, value):
+        super().__init__(line_nr, value)
 
 
 class CommentToken(LexerToken):
@@ -104,7 +112,12 @@ class SemiToken(LexerToken):
         super().__init__(line_nr)
 
 
-class ArithmeticToken(LexerToken):
+class OperatorToken(LexerToken):
+    def __init__(self, line_nr):
+        super().__init__(line_nr)
+
+
+class ArithmeticToken(OperatorToken):
     def __init__(self, line_nr):
         super().__init__(line_nr)
 
@@ -124,12 +137,12 @@ class MultiplicationToken(ArithmeticToken):
         super().__init__(line_nr)
 
 
-class AssignmentToken(LexerToken):
+class AssignmentToken(OperatorToken):
     def __init__(self, line_nr):
         super().__init__(line_nr)
 
 
-class ComparisonToken(LexerToken):
+class ComparisonToken(OperatorToken):
     def __init__(self, line_nr):
         super().__init__(line_nr)
 
@@ -254,6 +267,9 @@ def parse_token(txt: str, line_nr=-1):
         raise LexerException(
             "Error on line '{}'. Couldn't lex token around '{}'.".format(line_nr, txt[:16])
         )
+
+    if token in ["true", "false"]:
+        return BoolLiteralToken(line_nr, token), txt
 
     if token in keywords_list:
         return KeywordToken(line_nr, token), txt

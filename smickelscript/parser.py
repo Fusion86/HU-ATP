@@ -58,18 +58,25 @@ class FuncCallToken(ParserToken):
         self.args = args or []
 
 
-class ConditionToken(ParserToken):
+class OperatorToken(ParserToken):
     def __init__(self, lhs, operator, rhs):
         self.lhs = lhs
         self.operator = operator
         self.rhs = rhs
 
 
-class ArithmeticToken(ParserToken):
-    def __init__(self, lhs, operator, rhs):
-        self.lhs = lhs
-        self.operator = operator
-        self.rhs = rhs
+# class ConditionToken(OperatorToken):
+#     def __init__(self, lhs, operator, rhs):
+#         self.lhs = lhs
+#         self.operator = operator
+#         self.rhs = rhs
+
+
+# class ArithmeticToken(OperatorToken):
+#     def __init__(self, lhs, operator, rhs):
+#         self.lhs = lhs
+#         self.operator = operator
+#         self.rhs = rhs
 
 
 class IfStatementToken(ParserToken):
@@ -80,9 +87,9 @@ class IfStatementToken(ParserToken):
 
 
 class WhileStatementToken(ParserToken):
-    def __init__(self, condition, true):
+    def __init__(self, condition, body):
         self.condition = condition
-        self.true = true
+        self.body = body
 
 
 class FunctionToken(ParserToken):
@@ -177,7 +184,9 @@ def parse_statement(tokens: List[lexer.LexerToken]):
         return ast, tokens
     else:
         raise UnexpectedTokenException(
-            "Error on line {}. Unexpected token '{}'.".format(tokens[0].line_nr, token_type)
+            "Error on line {}. Unexpected token '{}'.".format(
+                tokens[0].line_nr, token_type.__name__
+            )
         )
 
 
@@ -211,17 +220,18 @@ def parse_identifier_action(tokens: List[lexer.LexerToken]):
 
     # Is it a comparison?
     # TODO: This shouldn't be here, this is already covered in the `parse_condition` function.
-    elif isinstance(tokens[0], lexer.ComparisonToken):
-        # lhs = token
-        operator, tokens = eat_one(tokens, lexer.ComparisonToken)
-        rhs, tokens = parse_statement(tokens)
-        token = ConditionToken(token, operator, rhs)
+    # elif isinstance(tokens[0], lexer.ComparisonToken):
+    #     # lhs = token
+    #     operator, tokens = eat_one(tokens, lexer.ComparisonToken)
+    #     rhs, tokens = parse_statement(tokens)
+    #     token = ConditionToken(token, operator, rhs)
+    #     raise Exception()
 
-    # Is it an arithmetic operation?
-    elif isinstance(tokens[0], lexer.ArithmeticToken):
-        operator, tokens = eat_one(tokens, lexer.ArithmeticToken)
+    # Is the next token an operator.
+    elif isinstance(tokens[0], lexer.OperatorToken):
+        operator, tokens = eat_one(tokens, lexer.OperatorToken)
         rhs, tokens = parse_statement(tokens)
-        token = ArithmeticToken(token, operator, rhs)
+        token = OperatorToken(token, operator, rhs)
 
     # All statements should end with a semicolon.
     # _, tokens = eat_one(tokens, lexer.SemiToken)

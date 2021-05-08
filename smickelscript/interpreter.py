@@ -1,5 +1,5 @@
 import os
-from typing import List, TypeVar
+from typing import List, TypeVar, Tuple, Type
 from functools import reduce
 from smickelscript import lexer, parser
 
@@ -25,6 +25,15 @@ class UndefinedVariableException(SmickelRuntimeException):
     pass
 
 
+class InvalidTypeException(SmickelRuntimeException):
+    def __init__(self, line_nr: int, expected_type: Type, actual_type: Type):
+        super().__init__(
+            "Error on line {}. Expected a value of type '{}' but got a value of type '{}'.".format(
+                line_nr, expected_type.__name__, actual_type.__name__
+            )
+        )
+
+
 default_stdout = lambda x: print(x, end="")
 
 
@@ -45,11 +54,10 @@ def run_file(filename: str, entrypoint="main", stdout=default_stdout):
     return run_program(parser.load_file(filename), entrypoint, stdout)
 
 
-def execute(ast, statement, state: ProgramState, stdout=default_stdout):
+def execute(ast, statement, state: ProgramState, stdout):
     statement_type = type(statement)
     if statement_type in statement_exec_map:
         return statement_exec_map[statement_type](ast, statement, state, stdout)
-        # return execute(ast, statement, state)
     else:
         raise NotImplementedError(statement_type)
 
@@ -66,10 +74,18 @@ def execute_func_call(ast, statement: parser.FuncCallToken, state: ProgramState,
 
     func = find_func(ast, func_to_call)
     if func:
-        # Create new stack scope and push the arguments
+        # Evaluate the args.
         args, state = execute_args(ast, statement.args, state, stdout)
-        stack = dict(zip(func.parameters, args))
-        state = ProgramState(state.stack + [stack])
+
+        # Extract param names
+        para_names = map(lambda x: x.identifier.value, func.parameters)
+
+        # Verify types
+        list(map(lambda x: verify_type(x[0], x[1]), zip(func.parameters, args)))
+
+        # Create new stack scope and push the arguments
+        new_stack_layer = dict(zip(para_names, args))
+        state = ProgramState(state.stack + [new_stack_layer])
 
         # Execute function
         retval, state = execute_func(ast, func, state, stdout)
@@ -103,18 +119,38 @@ def execute_scope(
     if create_new_stack_layer and counter == 0:
         state = ProgramState(state.stack + [{}])
 
+    # If we reached the end of the scope.
     if len(scope.body) <= counter:
         # Pop stack only if we also were the ones to create it.
         if create_new_stack_layer:
             state = ProgramState(state.stack[:-1])
         return None, state
 
+    # If this is a return statement.
+    # if type(scope.body[counter]) == parser.ReturnToken:
+    #     retval, state = execute(ast, scope.body[counter].value, state, stdout)
+
+    #     # Pop stack only if we also were the ones to create it.
+    #     if create_new_stack_layer:
+    #         state = ProgramState(state.stack[:-1])
+
+    #     return retval, state
+
+    # Else just continue executing the scope.
     retval, state = execute(ast, scope.body[counter], state, stdout)
+
+    if retval != None:
+        # Pop stack only if we also were the ones to create it.
+        if create_new_stack_layer:
+            state = ProgramState(state.stack[:-1])
+
+        return retval, state
+
     return execute_scope(ast, scope, state, stdout, create_new_stack_layer, counter + 1)
 
 
 def execute_init_var(ast: List, token: parser.InitVariableToken, state: ProgramState, stdout):
-    value, state = execute(ast, token.value, state)
+    value, state = execute(ast, token.value, state, stdout)
 
     # The code below does the same as this line:
     # state.stack[-1][token.identifier.value] = value
@@ -141,7 +177,7 @@ def execute_args(ast: List, args: List, state: ProgramState, stdout, retval=None
         retval = []
 
     if len(args) > 0:
-        val, state = execute(ast, args[0], state)
+        val, state = execute(ast, args[0], state, stdout)
         return execute_args(ast, args[1:], state, stdout, [val] + retval)
     else:
         return retval, state
@@ -185,20 +221,41 @@ def execute_var_assignment(
             layer[token.identifier.value] = value
             break
 
-    return value, state
+    # A variable assignment does NOT return a value.
+    return None, state
 
 
-def execute_arithmetic(ast: List, token: parser.ArithmeticToken, state: ProgramState, stdout):
-    lhs, state = execute(ast, token.lhs, state)
-    rhs, state = execute(ast, token.rhs, state)
+def execute_operator(ast: List, token: parser.OperatorToken, state: ProgramState, stdout):
+    lhs, state = execute(ast, token.lhs, state, stdout)
+    rhs, state = execute(ast, token.rhs, state, stdout)
     op_type = type(token.operator)
-    if op_type in arithmetic_operators:
-        return arithmetic_operators[op_type](lhs, rhs), state
+    if op_type in operators_map:
+        return operators_map[op_type](lhs, rhs), state
     else:
-        raise NotImplementedError(op_type)
+        raise NotImplementedError("Operator '{}' is not implemented.".format(op_type))
 
 
-def find_func(ast, func_name):
+def execute_if(ast: List, token: parser.IfStatementToken, state: ProgramState, stdout):
+    value, state = execute(ast, token.condition, state, stdout)
+    if value:
+        return execute(ast, token.true_body, state, stdout)
+    else:
+        return None, state
+
+
+def execute_return(ast: List, token: parser.ReturnToken, state: ProgramState, stdout):
+    return execute(ast, token.value, state, stdout)
+
+
+def execute_while(ast: List, token: parser.WhileStatementToken, state: ProgramState, stdout):
+    value, state = execute(ast, token.condition, state, stdout)
+    if value:
+        retval, state = execute(ast, token.body, state, stdout)
+        return execute_while(ast, token, state, stdout)
+    return None, state
+
+
+def find_func(ast, func_name) -> parser.FunctionToken:
     return next(
         (x for x in ast if type(x) == parser.FunctionToken and x.identifier.value == func_name),
         None,
@@ -221,6 +278,15 @@ def get_var_value(token: lexer.IdentifierToken, state: ProgramState) -> T:
     return values[-1]
 
 
+def verify_type(param: parser.FuncParameterToken, value):
+    if param.variable_type.type_name == "number":
+        if type(value) != int:
+            raise InvalidTypeException(param.identifier.line_nr, int, type(value))
+    elif param.variable_type.type_name == "string":
+        if type(value) != str:
+            raise InvalidTypeException(param.identifier.line_nr, int, type(value))
+
+
 statement_exec_map = {
     parser.FuncCallToken: execute_func_call,
     # parser.FunctionToken: execute_func,
@@ -230,11 +296,19 @@ statement_exec_map = {
     lexer.IdentifierToken: execute_identifier,
     lexer.CommentToken: execute_noop,
     parser.AssignVariableToken: execute_var_assignment,
-    parser.ArithmeticToken: execute_arithmetic,
+    parser.OperatorToken: execute_operator,
+    parser.IfStatementToken: execute_if,
+    parser.ReturnToken: execute_return,
+    parser.WhileStatementToken: execute_while,
 }
 
-arithmetic_operators = {
+operators_map = {
+    # Arithmetic
     lexer.AdditionToken: lambda a, b: a + b,
+    lexer.SubtractionToken: lambda a, b: a - b,
+    # Comparison
+    lexer.EqualToken: lambda a, b: a == b,
+    lexer.GreaterOrEqualToken: lambda a, b: a >= b,
 }
 
 if __name__ == "__main__":

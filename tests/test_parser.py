@@ -53,8 +53,8 @@ def test_variable_assignment_math():
     # This is not supported.
     src = "var a = 1 + 2;"
 
-    with pytest.raises(parser.UnexpectedTokenException):
-        ast = parse(src)
+    # with pytest.raises(parser.UnexpectedTokenException):
+    #     ast = parse(src)
 
 
 def test_arithmetic():
@@ -64,6 +64,35 @@ def test_arithmetic():
 
 def test_variable_move():
     src = "var a = 1; var b = a;"
+    ast = parse(src)
+
+
+def test_string_statement():
+    src = """
+    // The string constant 'returns itself' when executed, 
+    // when this is not printed or assigned to a variable nothing happens.
+    func main() { "String type"; }
+    """
+    ast = parse(src)
+
+
+def test_number_statement():
+    src = "1;"
+    ast = parse(src)
+
+
+def test_bool_statement():
+    src = "true;"
+    ast = parse(src)
+
+
+def test_comparison_statement():
+    src = "true == false;"
+    ast = parse(src)
+
+
+def test_arithmetic_statement():
+    src = "2 + 4;"
     ast = parse(src)
 
 
