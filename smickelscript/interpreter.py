@@ -15,30 +15,44 @@ class ProgramState:
 
 
 class SmickelRuntimeException(Exception):
+    """Generic runtime exception."""
+
     pass
 
 
 class EntrypointNotFoundException(SmickelRuntimeException):
+    """Thrown when the entrypoint is not found withing a given program."""
+
     pass
 
 
 class UndefinedVariableException(SmickelRuntimeException):
+    """Thrown when a variable is used before it has a value."""
+
     pass
 
 
 class InvalidImplicitReturnException(SmickelRuntimeException):
+    """Thrown when an invalid implicit return statement is evaluated."""
+
     pass
 
 
 class InvalidArgumentsException(SmickelRuntimeException):
+    """Thrown when the given arguments don't match a functions parameters."""
+
     pass
 
 
 class IllegalTypeException(SmickelRuntimeException):
+    """Thrown when an illegal type is encounter, for example when intializing a void variable."""
+
     pass
 
 
 class InvalidTypeException(SmickelRuntimeException):
+    """Thrown when a given value doesn't match the TypeHint."""
+
     def __init__(self, line_nr: int, expected_type: Type, actual_type: Type):
         super().__init__(
             "Error on line {}. Expected a value of type '{}' but got a value of type '{}'.".format(
@@ -70,7 +84,9 @@ def run_file(filename: str, entrypoint="main", args=None, stdout=default_stdout)
     return run_program(parser.load_file(filename), entrypoint, args, stdout)
 
 
-def execute(ast, statement, state: ProgramState, stdout):
+def execute(
+    ast: List[parser.ParserToken], statement: parser.ParserToken, state: ProgramState, stdout
+):
     statement_type = type(statement)
     if statement_type in statement_exec_map:
         return statement_exec_map[statement_type](ast, statement, state, stdout)
@@ -80,15 +96,10 @@ def execute(ast, statement, state: ProgramState, stdout):
         )
 
 
-def execute_func_call(ast, statement: parser.FuncCallToken, state: ProgramState, stdout):
+def execute_func_call(
+    ast: List[parser.ParserToken], statement: parser.FuncCallToken, state: ProgramState, stdout
+):
     func_to_call = statement.identifier.value
-
-    # if func_to_call == "println":
-    #     args, state = execute_args(ast, statement.args, state, stdout)
-    #     if len(args) > 1:
-    #         raise SmickelRuntimeException("println doesn't accept more than one argument.")
-    #     stdout((str(args[0]) if len(args) == 1 else "") + "\n")
-    #     return None, state
 
     if func_to_call in builtin_functions:
         return builtin_functions[func_to_call](ast, statement, state, stdout)
@@ -103,16 +114,18 @@ def execute_func_call(ast, statement: parser.FuncCallToken, state: ProgramState,
 
         return retval, state
     else:
-        raise Exception(
+        raise SmickelRuntimeException(
             "Can't call function {}, because it could not be found.".format(func_to_call)
         )
 
 
-def execute_noop(ast: List, token, state: ProgramState, stdout):
+def execute_noop(ast: List[parser.ParserToken], token, state: ProgramState, stdout):
     return None, state
 
 
-def execute_func(ast: List, func: parser.FunctionToken, state: ProgramState, stdout, args):
+def execute_func(
+    ast: List[parser.ParserToken], func: parser.FunctionToken, state: ProgramState, stdout, args
+):
     # Check that we have enough args.
     if len(args) != len(func.parameters):
         raise InvalidArgumentsException(
@@ -142,7 +155,7 @@ def execute_func(ast: List, func: parser.FunctionToken, state: ProgramState, std
 
 
 def execute_scope(
-    ast: List,
+    ast: List[parser.ParserToken],
     scope: parser.ScopeWithBody,
     state: ProgramState,
     stdout,
@@ -186,7 +199,9 @@ def execute_scope(
     return execute_scope(ast, scope, state, stdout, create_new_stack_layer, counter + 1)
 
 
-def execute_init_var(ast: List, token: parser.InitVariableToken, state: ProgramState, stdout):
+def execute_init_var(
+    ast: List[parser.ParserToken], token: parser.InitVariableToken, state: ProgramState, stdout
+):
     if token.variable_type.type_name == "void":
         raise IllegalTypeException(
             "Error on line {}. A variable can't have the type 'void'.".format(
@@ -207,19 +222,23 @@ def execute_init_var(ast: List, token: parser.InitVariableToken, state: ProgramS
     return None, state
 
 
-def execute_identifier(ast: List, token: lexer.IdentifierToken, state: ProgramState, stdout):
+def execute_identifier(
+    ast: List[parser.ParserToken], token: lexer.IdentifierToken, state: ProgramState, stdout
+):
     return get_var_value(token, state), state
 
 
 def execute_literal(
-    ast: List, token: parser.LiteralToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken], token: parser.LiteralToken, state: ProgramState, stdout
 ) -> Tuple[SmickelVariableType, ProgramState]:
     if type(token.value) == lexer.NumberLiteralToken:
         return int(token.value.value), state
     return token.value.value, state
 
 
-def execute_args(ast: List, args: List, state: ProgramState, stdout, retval=None):
+def execute_args(
+    ast: List[parser.ParserToken], args: List, state: ProgramState, stdout, retval=None
+):
     if retval == None:
         retval = []
 
@@ -231,48 +250,18 @@ def execute_args(ast: List, args: List, state: ProgramState, stdout, retval=None
 
 
 def execute_var_assignment(
-    ast: List, token: parser.AssignVariableToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken], token: parser.AssignVariableToken, state: ProgramState, stdout
 ):
-    # def find_layer_with_value(layer):
-    #     if token.identifier.value in layer:
-    #         return layer
-
     value, state = execute(ast, token.value, state, stdout)
-
-    # stacks_with_value = [x for x in map(find_layer_with_value, state.stack) if x != None]
-
-    # var_set = False
-    # newstack = list(
-    #     map(
-    #         lambda x: (
-    #             [dict(list(x.items()) + list({token.identifier.value: value}.items()))]
-    #             if token.identifier.value in x
-    #             else x
-    #         ),
-    #         state.stack,
-    #     )
-    # )
-
-    # def krins(a, b):
-    #     if type(a) == lexer.IdentifierToken:
-    #         b[token.identifier.value] = value
-    #         return b
-
-    #     return b
-
-    # newstack = reduce(krins, [token.identifier, *state.stack])
-
-    # TODO: Make this functional
-    for layer in reversed(state.stack):
-        if token.identifier.value in layer:
-            layer[token.identifier.value] = value
-            break
+    assign_var_value(state, token.identifier.value, value)
 
     # A variable assignment does NOT return a value.
     return None, state
 
 
-def execute_operator(ast: List, token: parser.OperatorToken, state: ProgramState, stdout):
+def execute_operator(
+    ast: List[parser.ParserToken], token: parser.OperatorToken, state: ProgramState, stdout
+):
     lhs, state = execute(ast, token.lhs, state, stdout)
     rhs, state = execute(ast, token.rhs, state, stdout)
     op_type = type(token.operator)
@@ -282,7 +271,9 @@ def execute_operator(ast: List, token: parser.OperatorToken, state: ProgramState
         raise NotImplementedError("Operator '{}' is not implemented.".format(op_type))
 
 
-def execute_if(ast: List, token: parser.IfStatementToken, state: ProgramState, stdout):
+def execute_if(
+    ast: List[parser.ParserToken], token: parser.IfStatementToken, state: ProgramState, stdout
+):
     value, state = execute(ast, token.condition, state, stdout)
     if value:
         return execute(ast, token.true_body, state, stdout)
@@ -290,11 +281,15 @@ def execute_if(ast: List, token: parser.IfStatementToken, state: ProgramState, s
         return None, state
 
 
-def execute_return(ast: List, token: parser.ReturnToken, state: ProgramState, stdout):
+def execute_return(
+    ast: List[parser.ParserToken], token: parser.ReturnToken, state: ProgramState, stdout
+):
     return execute(ast, token.value, state, stdout)
 
 
-def execute_while(ast: List, token: parser.WhileStatementToken, state: ProgramState, stdout):
+def execute_while(
+    ast: List[parser.ParserToken], token: parser.WhileStatementToken, state: ProgramState, stdout
+):
     value, state = execute(ast, token.condition, state, stdout)
     if value:
         retval, state = execute(ast, token.body, state, stdout)
@@ -302,7 +297,13 @@ def execute_while(ast: List, token: parser.WhileStatementToken, state: ProgramSt
     return None, state
 
 
-def execute_print(ast, statement: parser.FuncCallToken, state: ProgramState, stdout, end="\n"):
+def execute_print(
+    ast: List[parser.ParserToken],
+    statement: parser.FuncCallToken,
+    state: ProgramState,
+    stdout,
+    end="\n",
+):
     args, state = execute_args(ast, statement.args, state, stdout)
     if len(args) > 1:
         raise SmickelRuntimeException("print doesn't accept more than one argument.")
@@ -310,7 +311,7 @@ def execute_print(ast, statement: parser.FuncCallToken, state: ProgramState, std
     return None, state
 
 
-def find_func(ast, func_name) -> parser.FunctionToken:
+def find_func(ast: List[parser.ParserToken], func_name: str) -> parser.FunctionToken:
     return next(
         (x for x in ast if type(x) == parser.FunctionToken and x.identifier.value == func_name),
         None,
@@ -333,6 +334,34 @@ def get_var_value(token: lexer.IdentifierToken, state: ProgramState) -> SmickelV
     return values[-1]
 
 
+def assign_var_value(state: ProgramState, var_name: str, value, layer: int = None) -> ProgramState:
+    """Assing 'var_name' to 'value' in the first stack layer where it is found.
+
+    Args:
+        state (ProgramState):
+        var_name (str): The name of the value to assign.
+        value ([type]): The value which the var should be set to.
+        layer (int, optional): The layer in which to start looking. Defaults to None which means the top layer.
+
+    Raises:
+        SmickelRuntimeException: When a variable is not found. Should NEVER happen, but it's here to ensure that we know about it in the impossible case that it does.
+
+    Returns:
+        ProgramState: The new program state, in which the variable is assigned to the value.
+    """
+
+    if layer == None:
+        layer = len(state.stack) - 1
+
+    if var_name in state.stack[layer]:
+        state.stack[layer][var_name] = value
+        return state
+    elif layer > 1:
+        return assign_var_value(state, var_name, value, layer - 1)
+    else:
+        raise SmickelRuntimeException("Couldn't find variable to assign. This should never happen.")
+
+
 def verify_type(type_token: lexer.TypeToken, value):
     if type_token.type_name == "number":
         if type(value) != int:
@@ -340,6 +369,9 @@ def verify_type(type_token: lexer.TypeToken, value):
     elif type_token.type_name == "string":
         if type(value) != str:
             raise InvalidTypeException(type_token.line_nr, int, type(value))
+    else:
+        # No type given, or the type is not implemented.
+        pass
 
 
 builtin_functions = {
@@ -349,7 +381,6 @@ builtin_functions = {
 
 statement_exec_map = {
     parser.FuncCallToken: execute_func_call,
-    # parser.FunctionToken: execute_func,
     parser.LiteralToken: execute_literal,
     parser.ScopeWithBody: execute_scope,
     parser.InitVariableToken: execute_init_var,
@@ -376,8 +407,3 @@ explicit_return_statements = [
     parser.IfStatementToken,
     parser.WhileStatementToken,
 ]
-
-if __name__ == "__main__":
-    run_file("../example/hello_world.sc")
-    run_file("../example/hello_world_indirect.sc")
-    # run_file("../example/multi_scope.sc")

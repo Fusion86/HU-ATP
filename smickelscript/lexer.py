@@ -23,7 +23,7 @@ class LexerJsonEncoder(json.JSONEncoder):
 
 
 class LexerToken:
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         self.line_nr = line_nr
 
     def __repr__(self):
@@ -36,7 +36,7 @@ class LexerToken:
 
 
 class KeywordToken(LexerToken):
-    def __init__(self, line_nr, value):
+    def __init__(self, line_nr: int, value: str):
         super().__init__(line_nr)
         self.value = value
 
@@ -45,146 +45,146 @@ class KeywordToken(LexerToken):
 
 
 class TypeToken(LexerToken):
-    def __init__(self, line_nr, type_name):
+    def __init__(self, line_nr: int, type_name):
         super().__init__(line_nr)
         self.type_name = type_name
 
 
 class ValueToken(LexerToken):
-    def __init__(self, line_nr, value):
+    def __init__(self, line_nr: int, value: str):
         super().__init__(line_nr)
         self.value = value
 
 
 class IdentifierToken(ValueToken):
-    def __init__(self, line_nr, value):
+    def __init__(self, line_nr: int, value: str):
         super().__init__(line_nr, value)
 
 
 class LiteralToken(ValueToken):
-    def __init__(self, line_nr, value):
+    def __init__(self, line_nr: int, value: str):
         super().__init__(line_nr, value)
         self.value = value
 
 
 class StringLiteralToken(LiteralToken):
-    def __init__(self, line_nr, value):
+    def __init__(self, line_nr: int, value: str):
         super().__init__(line_nr, value)
 
 
 class NumberLiteralToken(LiteralToken):
-    def __init__(self, line_nr, value):
+    def __init__(self, line_nr: int, value: str):
         super().__init__(line_nr, value)
 
 
 class BoolLiteralToken(LiteralToken):
-    def __init__(self, line_nr, value):
+    def __init__(self, line_nr: int, value: str):
         super().__init__(line_nr, value)
 
 
 class CommentToken(LexerToken):
-    def __init__(self, line_nr, value):
+    def __init__(self, line_nr: int, value: str):
         super().__init__(line_nr)
         self.value = value
 
 
 class ScopeOpenToken(LexerToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class ScopeCloseToken(LexerToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class ArgumentsOpenToken(LexerToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class ArgumentsCloseToken(LexerToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class TypehintToken(LexerToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class SemiToken(LexerToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class ArgumentSeparatorToken(LexerToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class OperatorToken(LexerToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class ArithmeticToken(OperatorToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class AdditionToken(ArithmeticToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class SubtractionToken(ArithmeticToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class MultiplicationToken(ArithmeticToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class AssignmentToken(OperatorToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class ComparisonToken(OperatorToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class EqualToken(ComparisonToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class NotEqualToken(ComparisonToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class GreaterThanToken(ComparisonToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class SmallerThanToken(ComparisonToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class GreaterOrEqualToken(ComparisonToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
 class SmallerOrEqualToken(ComparisonToken):
-    def __init__(self, line_nr):
+    def __init__(self, line_nr: int):
         super().__init__(line_nr)
 
 
@@ -218,20 +218,20 @@ types_list = ["number", "string", "bool", "void"]
 comment_chars = ["#", "//"]
 
 
-def tokenize_file(filename: str):
+def tokenize_file(filename: str) -> List[LexerToken]:
     with open(filename) as f:
         return reduce(
             list.__add__, map(lambda x: tokenize(x[1], x[0] + 1), enumerate(f.readlines()))
         )
 
 
-def tokenize_str(txt: str):
+def tokenize_str(txt: str) -> List[LexerToken]:
     return reduce(
         list.__add__, map(lambda x: tokenize(x[1] + "\n", x[0] + 1), enumerate(txt.split("\n")))
     )
 
 
-def tokenize(txt: str, line_nr=-1, tokens: List[LexerToken] = None):
+def tokenize(txt: str, line_nr=-1, tokens: List[LexerToken] = None) -> List[LexerToken]:
     if tokens == None:
         tokens = []
 
@@ -241,7 +241,7 @@ def tokenize(txt: str, line_nr=-1, tokens: List[LexerToken] = None):
     return tokens
 
 
-def parse_token(txt: str, line_nr=-1):
+def parse_token(txt: str, line_nr=-1) -> Tuple[LexerToken, str]:
     txt = skip_whitespaces(txt)
 
     if len(txt) == 0:
@@ -295,7 +295,7 @@ def parse_token(txt: str, line_nr=-1):
     return IdentifierToken(line_nr, token), txt
 
 
-def parse_comment(txt: str, line_nr=-1, value: str = None):
+def parse_comment(txt: str, line_nr=-1, value: str = None) -> Tuple[CommentToken, str]:
     if value == None:
         if txt[0] in ["#", "/"]:
             return parse_comment(txt[1:], line_nr)
@@ -320,7 +320,7 @@ def parse_string_literal(txt: str, line_nr=-1, value: str = None) -> Tuple[Strin
         return parse_string_literal(txt[1:], line_nr, value + txt[0])
 
 
-def parse_operator(txt: str, line_nr=-1, operator=None):
+def parse_operator(txt: str, line_nr=-1, operator=None) -> Tuple[ComparisonToken, str]:
     if operator == None:
         txt = skip_whitespaces(txt)
         operator = ""
@@ -338,13 +338,30 @@ def parse_operator(txt: str, line_nr=-1, operator=None):
         return parse_operator(txt[1:], line_nr, operator + txt[0])
 
 
-def eat_word(txt: str):
+def eat_word(txt: str) -> Tuple[str, str]:
     return eat_while(txt, r"[a-zA-Z_!]")
 
 
-def eat_number(txt: str, line_nr=-1, eaten: str = None, first_digit=True, has_decimal_point=False):
+def eat_number(txt: str, line_nr=-1, eaten: str = None) -> Tuple[str, str]:
+    """Eat a number from the text stream.
+
+    Args:
+        txt (str): Text stream.
+        line_nr (int, optional): Line number. Defaults to -1.
+        eaten (str, optional): Already eaten characters, used recursively. Defaults to None.
+
+    Raises:
+        LexerException: [description]
+
+    Returns:
+        Tuple[str, str]: [description]
+    """
+
     if eaten == None:
         eaten = ""
+
+    first_digit = len(eaten) == 0
+    has_decimal_point = "." in eaten
 
     # Continue eating when the char is a number, or it is a decimal point.
     if len(txt) > 0 and (
@@ -357,12 +374,23 @@ def eat_number(txt: str, line_nr=-1, eaten: str = None, first_digit=True, has_de
                 )
             has_decimal_point = True
 
-        return eat_number(txt[1:], line_nr, eaten + txt[0], False, has_decimal_point)
+        return eat_number(txt[1:], line_nr, eaten + txt[0])
     else:
         return eaten, txt
 
 
-def eat_while(txt: str, pattern: str, eaten: str = None):
+def eat_while(txt: str, pattern: str, eaten: str = None) -> Tuple[str, str]:
+    """Eat characters from from the text stream as long as the pattern matches.
+
+    Args:
+        txt (str): Text stream.
+        pattern (str): A regex pattern, all matches are done character-by-character.
+        eaten (str, optional): Already eaten characters, used recursively. Defaults to None.
+
+    Returns:
+        Tuple[str, str]: Tuple with the eaten characters and the rest of the text stream.
+    """
+
     if eaten == None:
         eaten = ""
 
@@ -375,16 +403,33 @@ def eat_while(txt: str, pattern: str, eaten: str = None):
 
 
 def skip_whitespaces(txt: str) -> str:
+    """Skips all whitespaces in the text stream.
+
+    Args:
+        txt (str): Text stream.
+
+    Returns:
+        str: Text stream, but the front character is not a whitespace character.
+    """
     if len(txt) > 0 and txt[0].isspace():
         return skip_whitespaces(txt[1:])
     return txt
 
 
-def expect_character(txt: str, expected: str, line_nr=-1, _skip_whitespaces=False):
-    """
-    Check if the next character in the stream is the expected character.
-    If it is the stream pos will be incremented with one, if not the stream will be left untouched.
-    If skip_whitespaces is True the stream will be incremented for each skipped whitespace.
+def expect_character(txt: str, expected: str, line_nr=-1, _skip_whitespaces=False) -> str:
+    """Check if the next character in the stream is the expected character.
+
+    Args:
+        txt (str): The text to scan
+        expected (str): Expected character (should be exactly one char)
+        line_nr (int, optional): Line number at which the char is. Defaults to -1.
+        _skip_whitespaces (bool, optional): Defaults to False.
+
+    Raises:
+        UnexpectedCharacterException: When the expected character is not found.
+
+    Returns:
+        str: The rest of the text stream.
     """
 
     if _skip_whitespaces:
@@ -398,7 +443,7 @@ def expect_character(txt: str, expected: str, line_nr=-1, _skip_whitespaces=Fals
         )
 
 
-def print_tokens(tokens):
+def print_tokens(tokens: List[LexerToken]):
     print(json.dumps(tokens, indent=4, cls=LexerJsonEncoder))
 
 
