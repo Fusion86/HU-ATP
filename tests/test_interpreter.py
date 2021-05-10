@@ -251,6 +251,27 @@ def test_odd_even():
     assert run_capture_stdout(src) == "false\ntrue\ntrue\nfalse\n"
 
 
+def test_string_concat():
+    src = """
+    func main() {
+        var a = "Hello";
+        a = a + " ";
+        a = a + "World";
+        println(a);
+    }
+    """
+    assert run_capture_stdout(src) == "Hello World\n"
+
+def test_string_concat_multi():
+    src = """
+    func main() {
+        var a = "Hello";
+        a = a + " " + "World";
+        println(a);
+    }
+    """
+    assert run_capture_stdout(src) == "Hello World\n"
+
 def test_string_concat_func():
     src = """
     func say_hello_to(name: string): string {
