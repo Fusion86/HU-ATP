@@ -353,6 +353,7 @@ def parse_parameters(tokens, params=None):
 
     identifier, tokens = eat_one(tokens, lexer.IdentifierToken)
     type_token, tokens = parse_typehint(tokens)
+    arg_separator, tokens = eat_one(tokens, lexer.ArgumentSeparatorToken, False)
     return parse_parameters(tokens, params + [FuncParameterToken(identifier, type_token)])
 
 
@@ -365,6 +366,7 @@ def parse_arguments(tokens, args=None):
         return args, tokens[1:]
 
     statement, tokens = parse_statement(tokens)
+    arg_separator, tokens = eat_one(tokens, lexer.ArgumentSeparatorToken, False)
     # return parse_arguments(tokens, args + [ArgumentToken(statement)])
     return parse_arguments(tokens, args + [statement])
 

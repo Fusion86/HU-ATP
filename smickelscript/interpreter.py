@@ -26,6 +26,10 @@ class UndefinedVariableException(SmickelRuntimeException):
     pass
 
 
+class InvalidImplicitReturnException(SmickelRuntimeException):
+    pass
+
+
 class InvalidTypeException(SmickelRuntimeException):
     def __init__(self, line_nr: int, expected_type: Type, actual_type: Type):
         super().__init__(
@@ -60,7 +64,9 @@ def execute(ast, statement, state: ProgramState, stdout):
     if statement_type in statement_exec_map:
         return statement_exec_map[statement_type](ast, statement, state, stdout)
     else:
-        raise NotImplementedError(statement_type)
+        raise NotImplementedError(
+            "Statement {} is not implemented.".format(statement_type.__name__)
+        )
 
 
 def execute_func_call(ast, statement: parser.FuncCallToken, state: ProgramState, stdout):
@@ -129,20 +135,24 @@ def execute_scope(
             state = ProgramState(state.stack[:-1])
         return None, state
 
-    # If this is a return statement.
-    # if type(scope.body[counter]) == parser.ReturnToken:
-    #     retval, state = execute(ast, scope.body[counter].value, state, stdout)
-
-    #     # Pop stack only if we also were the ones to create it.
-    #     if create_new_stack_layer:
-    #         state = ProgramState(state.stack[:-1])
-
-    #     return retval, state
-
     # Else just continue executing the scope.
     retval, state = execute(ast, scope.body[counter], state, stdout)
 
+    # Return when a return value is given.
+    # TODO: This also returns when a user does something like `"Hello"`, even without the return keyword!
     if retval != None:
+        # Throw an error if the implicit return is not the last statement in the body and not a statements_that_may_return.
+        if (
+            len(scope.body) != counter + 1
+            and type(scope.body[counter]) not in explicit_return_statements
+        ):
+            line_nr = scope.body[counter].value.line_nr
+            raise InvalidImplicitReturnException(
+                "Error on line {}. This implicit return statement is not the last statement in its scope.".format(
+                    line_nr
+                )
+            )
+
         # Pop stack only if we also were the ones to create it.
         if create_new_stack_layer:
             state = ProgramState(state.stack[:-1])
@@ -314,6 +324,12 @@ operators_map = {
     lexer.EqualToken: lambda a, b: a == b,
     lexer.GreaterOrEqualToken: lambda a, b: a >= b,
 }
+
+explicit_return_statements = [
+    parser.ReturnToken,
+    parser.IfStatementToken,
+    parser.WhileStatementToken,
+]
 
 if __name__ == "__main__":
     run_file("../example/hello_world.suc")

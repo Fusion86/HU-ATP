@@ -118,6 +118,11 @@ class SemiToken(LexerToken):
         super().__init__(line_nr)
 
 
+class ArgumentSeparatorToken(LexerToken):
+    def __init__(self, line_nr):
+        super().__init__(line_nr)
+
+
 class OperatorToken(LexerToken):
     def __init__(self, line_nr):
         super().__init__(line_nr)
@@ -266,6 +271,10 @@ def parse_token(txt: str, line_nr=-1):
     # Check if this is an arithmetic operator
     if txt[0] in arithmetic_operator_map:
         return arithmetic_operator_map[txt[0]](line_nr), txt[1:]
+
+    # Check if this is a argument separator
+    if txt[0] == ",":
+        return ArgumentSeparatorToken(line_nr), txt[1:]
 
     token, txt = eat_word(txt)
 

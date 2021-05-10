@@ -300,3 +300,57 @@ def test_main_number_no_return():
     src = "func main(): number { }"
     with pytest.raises(interpreter.InvalidTypeException):
         run_source(src)
+
+
+def test_func_call_2_params():
+    src = """
+    func hello(a: string, b: string): string {
+        return "Sup";
+    }
+
+    func main() {
+        println(hello("Hello", "World"));
+    }
+    """
+    assert run_capture_stdout(src) == "Sup\n"
+
+
+def test_implicit_number_return():
+    src = """
+    func add(a: number, b: number) {
+        a + b;
+    }
+
+    func main() {
+        println(add(5, 6));
+    }
+    """
+    assert run_capture_stdout(src) == "11\n"
+
+
+def test_implicit_string_return():
+    src = """
+    func hello(): string {
+        "Hello";
+    }
+
+    func main() {
+        println(hello());
+    }
+    """
+    assert run_capture_stdout(src) == "Hello\n"
+
+
+def test_invalid_implicit_string_return():
+    src = """
+    func hello(): string {
+        "Hello";
+        "World";
+    }
+
+    func main() {
+        println(hello());
+    }
+    """
+    with pytest.raises(interpreter.InvalidImplicitReturnException):
+        run_source(src)
