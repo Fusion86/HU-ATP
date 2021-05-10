@@ -262,6 +262,7 @@ def test_string_concat():
     """
     assert run_capture_stdout(src) == "Hello World\n"
 
+
 def test_string_concat_multi():
     src = """
     func main() {
@@ -271,6 +272,7 @@ def test_string_concat_multi():
     }
     """
     assert run_capture_stdout(src) == "Hello World\n"
+
 
 def test_string_concat_func():
     src = """
@@ -375,3 +377,47 @@ def test_invalid_implicit_string_return():
     """
     with pytest.raises(interpreter.InvalidImplicitReturnException):
         run_source(src)
+
+
+def test_init_void_var():
+    src = """
+    func main() {
+        var a: void;
+    }
+    """
+    with pytest.raises(interpreter.IllegalTypeException):
+        run_source(src)
+
+
+def test_assign_void_var():
+    src = """
+    func main() {
+        var a: void = 3;
+    }
+    """
+    with pytest.raises(interpreter.IllegalTypeException):
+        run_source(src)
+
+
+def test_string_literal_typing():
+    src = """
+    func main() {
+        var a: number = "1\";
+    }
+    """
+    with pytest.raises(interpreter.InvalidTypeException):
+        run_source(src)
+
+
+def test_nested_call_hell():
+    src = """
+    func a(n: number) { return b(n + 1); }
+    func b(n: number) { return c(n + 1); }
+    func c(n: number) { return d(n + 1); }
+    func d(n: number) { return n + 1; }
+
+    func main() {
+        print(a(4));
+    }
+    """
+    assert run_capture_stdout(src) == "8"

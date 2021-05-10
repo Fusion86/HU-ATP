@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+setup.py
+smickelscript/__init__.py
+smickelscript/cli.py
+smickelscript/interpreter.py
+smickelscript/lexer.py
+smickelscript/parser.py
+smickelscript.egg-info/PKG-INFO
+smickelscript.egg-info/SOURCES.txt
+smickelscript.egg-info/dependency_links.txt
+smickelscript.egg-info/top_level.txt

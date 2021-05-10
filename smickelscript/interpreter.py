@@ -30,6 +30,14 @@ class InvalidImplicitReturnException(SmickelRuntimeException):
     pass
 
 
+class InvalidArgumentsException(SmickelRuntimeException):
+    pass
+
+
+class IllegalTypeException(SmickelRuntimeException):
+    pass
+
+
 class InvalidTypeException(SmickelRuntimeException):
     def __init__(self, line_nr: int, expected_type: Type, actual_type: Type):
         super().__init__(
@@ -42,21 +50,24 @@ class InvalidTypeException(SmickelRuntimeException):
 default_stdout = lambda x: print(x, end="")
 
 
-def run_program(ast, entrypoint="main", stdout=default_stdout) -> SmickelVariableType:
+def run_program(ast, entrypoint="main", args=None, stdout=default_stdout) -> SmickelVariableType:
+    if args == None:
+        args = []
+
     func = find_func(ast, entrypoint)
 
     if func == None:
         raise EntrypointNotFoundException("Entrypoint '{}' not found.".format(entrypoint))
 
-    return execute_func(ast, func, ProgramState(), stdout)[0]
+    return execute_func(ast, func, ProgramState(), stdout, args)[0]
 
 
-def run_source(source: str, entrypoint="main", stdout=default_stdout):
-    return run_program(parser.load_source(source), entrypoint, stdout)
+def run_source(source: str, entrypoint="main", args=None, stdout=default_stdout):
+    return run_program(parser.load_source(source), entrypoint, args, stdout)
 
 
-def run_file(filename: str, entrypoint="main", stdout=default_stdout):
-    return run_program(parser.load_file(filename), entrypoint, stdout)
+def run_file(filename: str, entrypoint="main", args=None, stdout=default_stdout):
+    return run_program(parser.load_file(filename), entrypoint, args, stdout)
 
 
 def execute(ast, statement, state: ProgramState, stdout):
@@ -72,37 +83,28 @@ def execute(ast, statement, state: ProgramState, stdout):
 def execute_func_call(ast, statement: parser.FuncCallToken, state: ProgramState, stdout):
     func_to_call = statement.identifier.value
 
-    if func_to_call == "println":
-        args, state = execute_args(ast, statement.args, state, stdout)
-        if len(args) > 1:
-            raise SmickelRuntimeException("println doesn't accept more than one argument.")
-        stdout((str(args[0]) if len(args) == 1 else "") + "\n")
-        return None, state
+    # if func_to_call == "println":
+    #     args, state = execute_args(ast, statement.args, state, stdout)
+    #     if len(args) > 1:
+    #         raise SmickelRuntimeException("println doesn't accept more than one argument.")
+    #     stdout((str(args[0]) if len(args) == 1 else "") + "\n")
+    #     return None, state
+
+    if func_to_call in builtin_functions:
+        return builtin_functions[func_to_call](ast, statement, state, stdout)
 
     func = find_func(ast, func_to_call)
     if func:
         # Evaluate the args.
         args, state = execute_args(ast, statement.args, state, stdout)
 
-        # Extract param names
-        para_names = map(lambda x: x.identifier.value, func.parameters)
-
-        # Verify types
-        list(map(lambda x: verify_type(x[0].variable_type, x[1]), zip(func.parameters, args)))
-
-        # Create new stack scope and push the arguments
-        new_stack_layer = dict(zip(para_names, args))
-        state = ProgramState(state.stack + [new_stack_layer])
-
         # Execute function
-        retval, state = execute_func(ast, func, state, stdout)
+        retval, state = execute_func(ast, func, state, stdout, args)
 
-        # Pop stack
-        state = ProgramState(state.stack[:-1])
         return retval, state
     else:
         raise Exception(
-            "Can't call function '{}', because it could not be found.".format(func_to_call)
+            "Can't call function {}, because it could not be found.".format(func_to_call)
         )
 
 
@@ -110,9 +112,32 @@ def execute_noop(ast: List, token, state: ProgramState, stdout):
     return None, state
 
 
-def execute_func(ast: List, func: parser.FunctionToken, state: ProgramState, stdout):
+def execute_func(ast: List, func: parser.FunctionToken, state: ProgramState, stdout, args):
+    # Check that we have enough args.
+    if len(args) != len(func.parameters):
+        raise InvalidArgumentsException(
+            "Error on line {}. Function '{}' expects {} parameters, but it got {} parameterse".format(
+                func.identifier.line_nr, func.identifier.value, len(func.parameters), len(args)
+            )
+        )
+
+    # Extract param names.
+    para_names = map(lambda x: x.identifier.value, func.parameters)
+
+    # Verify types.
+    list(map(lambda x: verify_type(x[0].variable_type, x[1]), zip(func.parameters, args)))
+
+    # Create new stack scope and push the arguments.
+    new_stack_layer = dict(zip(para_names, args))
+    state = ProgramState(state.stack + [new_stack_layer])
+
+    # Execute body and verify return type.
     retval, state = execute_scope(ast, func.body, state, stdout, False)
     verify_type(func.return_type, retval)
+
+    # Pop stack.
+    state = ProgramState(state.stack[:-1])
+
     return retval, state
 
 
@@ -162,7 +187,15 @@ def execute_scope(
 
 
 def execute_init_var(ast: List, token: parser.InitVariableToken, state: ProgramState, stdout):
+    if token.variable_type.type_name == "void":
+        raise IllegalTypeException(
+            "Error on line {}. A variable can't have the type 'void'.".format(
+                token.identifier.line_nr
+            )
+        )
+
     value, state = execute(ast, token.value, state, stdout)
+    verify_type(token.variable_type, value)
 
     # The code below does the same as this line:
     # state.stack[-1][token.identifier.value] = value
@@ -269,6 +302,14 @@ def execute_while(ast: List, token: parser.WhileStatementToken, state: ProgramSt
     return None, state
 
 
+def execute_print(ast, statement: parser.FuncCallToken, state: ProgramState, stdout, end="\n"):
+    args, state = execute_args(ast, statement.args, state, stdout)
+    if len(args) > 1:
+        raise SmickelRuntimeException("print doesn't accept more than one argument.")
+    stdout((str(args[0]) if len(args) == 1 else "") + end)
+    return None, state
+
+
 def find_func(ast, func_name) -> parser.FunctionToken:
     return next(
         (x for x in ast if type(x) == parser.FunctionToken and x.identifier.value == func_name),
@@ -301,6 +342,11 @@ def verify_type(type_token: lexer.TypeToken, value):
             raise InvalidTypeException(type_token.line_nr, int, type(value))
 
 
+builtin_functions = {
+    "println": execute_print,
+    "print": lambda *x: execute_print(*x, end=""),
+}
+
 statement_exec_map = {
     parser.FuncCallToken: execute_func_call,
     # parser.FunctionToken: execute_func,
@@ -332,6 +378,6 @@ explicit_return_statements = [
 ]
 
 if __name__ == "__main__":
-    run_file("../example/hello_world.suc")
-    run_file("../example/hello_world_indirect.suc")
-    # run_file("../example/multi_scope.suc")
+    run_file("../example/hello_world.sc")
+    run_file("../example/hello_world_indirect.sc")
+    # run_file("../example/multi_scope.sc")
