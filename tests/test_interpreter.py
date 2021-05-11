@@ -21,7 +21,6 @@ def test_var_assignment():
     run_source(src)
 
 
-
 def test_arithmetic_sub():
     src = """
     func main() {
@@ -42,6 +41,17 @@ def test_arithmetic_add_negative_no_space():
     }
     """
     assert run_capture_stdout(src) == "4\n"
+
+
+def test_arithmetic_mult():
+    src = """
+    func main() {
+        var a = 5;
+        a = a * 5;
+        println(a);
+    }
+    """
+    assert run_capture_stdout(src) == "25\n"
 
 
 def test_arithmetic_sub_negative():
@@ -202,7 +212,6 @@ def test_string_concat():
     assert run_capture_stdout(src) == "Hello World\n"
 
 
-
 def test_exit_code():
     src = "func main() { return 1; }"
     res = run_source(src)
@@ -346,3 +355,64 @@ def test_duplicate_func():
     """
     with pytest.raises(interpreter.SmickelRuntimeException):
         run_source(src)
+
+
+def test_rand():
+    src = """
+    func main() {
+        var a: number = rand();
+        println(a);
+    }
+    """
+    assert run_capture_stdout(src) in ["1\n", "0\n"]
+
+
+def test_rand_max():
+    src = """
+    func main() {
+        var a: number = rand(2);
+        println(a);
+    }
+    """
+    assert run_capture_stdout(src) in ["2\n", "1\n", "0\n"]
+
+
+def test_rand_range():
+    src = """
+    func main() {
+        var a: number = rand(1,4);
+        println(a);
+    }
+    """
+    assert run_capture_stdout(src) in ["1\n", "2\n", "3\n", "4\n"]
+
+
+def test_equal():
+    src = """
+    func main() {
+        var a = 1;
+        println(a == 1);
+    }
+    """
+    assert run_capture_stdout(src) == "True\n"
+
+
+def test_not_equal():
+    src = """
+    func main() {
+        var a = 1;
+        println(a != 1);
+    }
+    """
+    assert run_capture_stdout(src) == "False\n"
+
+
+def test_smaller_or_equal():
+    src = """
+    func main() {
+        var a = 1;
+        println(a <= 2);
+        println(a <= 0);
+    }
+    """
+    assert run_capture_stdout(src) == "True\nFalse\n"

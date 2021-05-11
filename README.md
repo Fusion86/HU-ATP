@@ -20,7 +20,6 @@ Some things which could be improved. The language is "Jan-Complete" at the momen
 - Better debugging (trace state changes?)
 - Better error message when a function is missing a return statement (but a return typehint is given), see `test_main_number_no_return`
 - Some interesting example code
-- Rand() function?
 
 ## Usage
 

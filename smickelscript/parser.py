@@ -300,8 +300,6 @@ def parse_identifier_action(
     if isinstance(token, lexer.LiteralToken):
         return LiteralToken(token), tokens
 
-    # All statements should end with a semicolon.
-    # _, tokens = eat_one(tokens, lexer.SemiToken)
     return token, tokens
 
 

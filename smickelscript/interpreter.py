@@ -1,4 +1,5 @@
 import os
+import random
 from typing import List, TypeVar, Tuple, Type, Optional, Callable
 from functools import reduce
 from smickelscript import lexer, parser
@@ -280,7 +281,7 @@ def execute_args(
 
     if len(args) > 0:
         val, state = execute(ast, args[0], state, stdout)
-        return execute_args(ast, args[1:], state, stdout, [val] + retval)
+        return execute_args(ast, args[1:], state, stdout, retval + [val])
     else:
         return retval, state
 
@@ -365,6 +366,23 @@ def execute_print(
     return None, state
 
 
+@smickel_trace
+def execute_rand(
+    ast: List[parser.ParserToken],
+    statement: parser.FuncCallToken,
+    state: ProgramState,
+    stdout: Callable,
+):
+    args, state = execute_args(ast, statement.args, state, stdout)
+    if len(args) == 0:
+        a, b = (0, 1)
+    elif len(args) == 1:
+        a, b = (0, args[0])
+    else:
+        a, b = args
+    return random.randint(a, b), state
+
+
 def find_func(ast: List[parser.ParserToken], func_name: str) -> Optional[parser.FunctionToken]:
     # return next(
     #     (x for x in ast if type(x) == parser.FunctionToken and x.identifier.value == func_name),
@@ -440,6 +458,7 @@ def verify_type(type_token: lexer.TypeToken, value):
 builtin_functions = {
     "println": execute_print,
     "print": lambda *x: execute_print(*x, end=""),
+    "rand": execute_rand,
 }
 
 statement_exec_map = {
@@ -460,9 +479,14 @@ operators_map = {
     # Arithmetic
     lexer.AdditionToken: lambda a, b: a + b,
     lexer.SubtractionToken: lambda a, b: a - b,
+    lexer.MultiplicationToken: lambda a, b: a * b,
     # Comparison
     lexer.EqualToken: lambda a, b: a == b,
+    lexer.NotEqualToken: lambda a, b: a != b,
+    lexer.GreaterThanToken: lambda a, b: a > b,
+    lexer.SmallerThanToken: lambda a, b: a < b,
     lexer.GreaterOrEqualToken: lambda a, b: a >= b,
+    lexer.SmallerOrEqualToken: lambda a, b: a <= b,
 }
 
 explicit_return_statements = [
