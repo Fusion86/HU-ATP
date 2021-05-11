@@ -1,5 +1,5 @@
+import os
 import click
-from smickelscript import interpreter
 
 
 @click.group()
@@ -12,7 +12,8 @@ def cli():
 @click.argument("args", required=False, nargs=-1)
 @click.option("--input", "-i", type=str, help="Input source file")
 @click.option("--entrypoint", "-e", type=str, help="Entrypoint (default is main)", default="main")
-def exec(input, entrypoint: str, args):
+@click.option("--trace/--no-trace", type=bool, help="Show trace logging", default=False)
+def exec(input, entrypoint: str, trace: bool, args):
     def parse_arg(x: str):
         if len(x) == 0:
             return ""
@@ -21,15 +22,24 @@ def exec(input, entrypoint: str, args):
         except Exception:
             return x
 
+    if trace:
+        os.environ["SMICKEL_TRACE"] = "1"
+
+    # This needs to happen AFTER settings os.environ
+    from smickelscript import interpreter
+
     # If you want to use map then I guess this works too.
-    # args = list(map(parse_arg, args.split(" ")))
+    args = list(map(parse_arg, args))
 
     # Pythonic way to solve this.
-    args = [parse_arg(x) for x in args]
+    # args = [parse_arg(x) for x in args]
 
     print("> Executing {} function in '{}' with args {}".format(entrypoint, input, args))
-    retval = interpreter.run_file(input, entrypoint, args)
-    print("> Function returned: {}".format(retval))
+    try:
+        retval = interpreter.run_file(input, entrypoint, args)
+        print("> Function returned: {}".format(retval))
+    except Exception as ex:
+        print("> {}".format(ex))
 
 
 if __name__ == "__main__":

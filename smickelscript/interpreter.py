@@ -1,10 +1,9 @@
 import os
-from typing import List, TypeVar, Tuple, Type
+from typing import List, TypeVar, Tuple, Type, Optional, Callable
 from functools import reduce
 from smickelscript import lexer, parser
 
 
-T = TypeVar("T")
 SmickelVariableType = TypeVar("SmickelVariableType")
 
 
@@ -61,10 +60,23 @@ class InvalidTypeException(SmickelRuntimeException):
         )
 
 
+# This is not a good way to do this, but creating a crappy decorator is part of the requirements.
+def smickel_trace(func: Callable):
+    def wrapper(*args, **kwargs):
+        print("TRACE> Executing '{}'".format(func.__name__))
+        return func(*args, **kwargs)
+
+    if os.environ.get("SMICKEL_TRACE"):
+        return wrapper
+    return func
+
+
 default_stdout = lambda x: print(x, end="")
 
 
-def run_program(ast, entrypoint="main", args=None, stdout=default_stdout) -> SmickelVariableType:
+def run_program(
+    ast, entrypoint="main", args=None, stdout: Callable = default_stdout
+) -> SmickelVariableType:
     if args == None:
         args = []
 
@@ -85,7 +97,10 @@ def run_file(filename: str, entrypoint="main", args=None, stdout=default_stdout)
 
 
 def execute(
-    ast: List[parser.ParserToken], statement: parser.ParserToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken],
+    statement: parser.ParserToken,
+    state: ProgramState,
+    stdout: Callable,
 ):
     statement_type = type(statement)
     if statement_type in statement_exec_map:
@@ -96,8 +111,12 @@ def execute(
         )
 
 
+@smickel_trace
 def execute_func_call(
-    ast: List[parser.ParserToken], statement: parser.FuncCallToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken],
+    statement: parser.FuncCallToken,
+    state: ProgramState,
+    stdout: Callable,
 ):
     func_to_call = statement.identifier.value
 
@@ -119,17 +138,23 @@ def execute_func_call(
         )
 
 
-def execute_noop(ast: List[parser.ParserToken], token, state: ProgramState, stdout):
+@smickel_trace
+def execute_noop(ast: List[parser.ParserToken], token, state: ProgramState, stdout: Callable):
     return None, state
 
 
+@smickel_trace
 def execute_func(
-    ast: List[parser.ParserToken], func: parser.FunctionToken, state: ProgramState, stdout, args
+    ast: List[parser.ParserToken],
+    func: parser.FunctionToken,
+    state: ProgramState,
+    stdout: Callable,
+    args: List,
 ):
     # Check that we have enough args.
     if len(args) != len(func.parameters):
         raise InvalidArgumentsException(
-            "Error on line {}. Function '{}' expects {} parameters, but it got {} parameterse".format(
+            "Error on line {}. Function '{}' expects {} parameters, but it got {} parameters.".format(
                 func.identifier.line_nr, func.identifier.value, len(func.parameters), len(args)
             )
         )
@@ -154,11 +179,12 @@ def execute_func(
     return retval, state
 
 
+@smickel_trace
 def execute_scope(
     ast: List[parser.ParserToken],
     scope: parser.ScopeWithBody,
     state: ProgramState,
-    stdout,
+    stdout: Callable,
     create_new_stack_layer=True,
     counter=0,
 ):
@@ -199,8 +225,12 @@ def execute_scope(
     return execute_scope(ast, scope, state, stdout, create_new_stack_layer, counter + 1)
 
 
+@smickel_trace
 def execute_init_var(
-    ast: List[parser.ParserToken], token: parser.InitVariableToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken],
+    token: parser.InitVariableToken,
+    state: ProgramState,
+    stdout: Callable,
 ):
     if token.variable_type.type_name == "void":
         raise IllegalTypeException(
@@ -222,22 +252,28 @@ def execute_init_var(
     return None, state
 
 
+@smickel_trace
 def execute_identifier(
-    ast: List[parser.ParserToken], token: lexer.IdentifierToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken],
+    token: lexer.IdentifierToken,
+    state: ProgramState,
+    stdout: Callable,
 ):
     return get_var_value(token, state), state
 
 
+@smickel_trace
 def execute_literal(
-    ast: List[parser.ParserToken], token: parser.LiteralToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken], token: parser.LiteralToken, state: ProgramState, stdout: Callable
 ) -> Tuple[SmickelVariableType, ProgramState]:
     if type(token.value) == lexer.NumberLiteralToken:
         return int(token.value.value), state
     return token.value.value, state
 
 
+@smickel_trace
 def execute_args(
-    ast: List[parser.ParserToken], args: List, state: ProgramState, stdout, retval=None
+    ast: List[parser.ParserToken], args: List, state: ProgramState, stdout: Callable, retval=None
 ):
     if retval == None:
         retval = []
@@ -249,8 +285,12 @@ def execute_args(
         return retval, state
 
 
+@smickel_trace
 def execute_var_assignment(
-    ast: List[parser.ParserToken], token: parser.AssignVariableToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken],
+    token: parser.AssignVariableToken,
+    state: ProgramState,
+    stdout: Callable,
 ):
     value, state = execute(ast, token.value, state, stdout)
     assign_var_value(state, token.identifier.value, value)
@@ -259,8 +299,12 @@ def execute_var_assignment(
     return None, state
 
 
+@smickel_trace
 def execute_operator(
-    ast: List[parser.ParserToken], token: parser.OperatorToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken],
+    token: parser.OperatorToken,
+    state: ProgramState,
+    stdout: Callable,
 ):
     lhs, state = execute(ast, token.lhs, state, stdout)
     rhs, state = execute(ast, token.rhs, state, stdout)
@@ -271,8 +315,12 @@ def execute_operator(
         raise NotImplementedError("Operator '{}' is not implemented.".format(op_type))
 
 
+@smickel_trace
 def execute_if(
-    ast: List[parser.ParserToken], token: parser.IfStatementToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken],
+    token: parser.IfStatementToken,
+    state: ProgramState,
+    stdout: Callable,
 ):
     value, state = execute(ast, token.condition, state, stdout)
     if value:
@@ -281,14 +329,19 @@ def execute_if(
         return None, state
 
 
+@smickel_trace
 def execute_return(
-    ast: List[parser.ParserToken], token: parser.ReturnToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken], token: parser.ReturnToken, state: ProgramState, stdout: Callable
 ):
     return execute(ast, token.value, state, stdout)
 
 
+@smickel_trace
 def execute_while(
-    ast: List[parser.ParserToken], token: parser.WhileStatementToken, state: ProgramState, stdout
+    ast: List[parser.ParserToken],
+    token: parser.WhileStatementToken,
+    state: ProgramState,
+    stdout: Callable,
 ):
     value, state = execute(ast, token.condition, state, stdout)
     if value:
@@ -297,11 +350,12 @@ def execute_while(
     return None, state
 
 
+@smickel_trace
 def execute_print(
     ast: List[parser.ParserToken],
     statement: parser.FuncCallToken,
     state: ProgramState,
-    stdout,
+    stdout: Callable,
     end="\n",
 ):
     args, state = execute_args(ast, statement.args, state, stdout)
@@ -311,11 +365,20 @@ def execute_print(
     return None, state
 
 
-def find_func(ast: List[parser.ParserToken], func_name: str) -> parser.FunctionToken:
-    return next(
-        (x for x in ast if type(x) == parser.FunctionToken and x.identifier.value == func_name),
-        None,
-    )
+def find_func(ast: List[parser.ParserToken], func_name: str) -> Optional[parser.FunctionToken]:
+    # return next(
+    #     (x for x in ast if type(x) == parser.FunctionToken and x.identifier.value == func_name),
+    #     None,
+    # )
+
+    funcs = [x for x in ast if type(x) == parser.FunctionToken and x.identifier.value == func_name]
+    if len(funcs) == 0:
+        return None
+    elif len(funcs) > 1:
+        raise SmickelRuntimeException(
+            "There are more than one '{}' functions. This is not supported.".format(func_name)
+        )
+    return funcs[0]
 
 
 def get_var_value(token: lexer.IdentifierToken, state: ProgramState) -> SmickelVariableType:
