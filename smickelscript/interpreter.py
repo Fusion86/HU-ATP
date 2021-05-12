@@ -211,7 +211,10 @@ def execute_scope(
             len(scope.body) != counter + 1
             and type(scope.body[counter]) not in explicit_return_statements
         ):
-            line_nr = scope.body[counter].value.line_nr
+            if isinstance(scope.body[counter], lexer.ValueToken):
+                line_nr = scope.body[counter].line_nr
+            else:
+                line_nr = scope.body[counter].value.line_nr
             raise InvalidImplicitReturnException(
                 "Error on line {}. This implicit return statement is not the last statement in its scope.".format(
                     line_nr

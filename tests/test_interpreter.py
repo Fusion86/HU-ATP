@@ -416,3 +416,95 @@ def test_smaller_or_equal():
     }
     """
     assert run_capture_stdout(src) == "True\nFalse\n"
+
+
+def test_manual_division():
+    src = """
+    func division(a: number, b: number): number {
+        var c: number = 0;
+        a = a - b;
+        while (a >= 0) {
+            a = a - b;
+            c = c + 1;
+        }
+        return c;
+    }
+
+    func main() {
+        println(division(10,1));
+        println(division(10,2));
+        println(division(10,3));
+        println(division(10,10));
+        println(division(10,20));
+    }
+    """
+    assert run_capture_stdout(src) == "10\n5\n3\n1\n0\n"
+
+
+def test_invalid_implicit_return():
+    src = """
+    func main() {
+        var a = 1;
+        a;
+        return a;
+    }
+    """
+    with pytest.raises(interpreter.InvalidImplicitReturnException):
+        run_source(src)
+
+
+def test_cursed_arrays():
+    src = """
+    func get_item(i: number) {
+        if (i == 0) {
+            return a;
+        }
+
+        if (i == 1) {
+            return b;
+        }
+
+        if (i == 2) {
+            return c;
+        }
+    }
+
+    func set_item(i: number, value: number) {
+        if (i == 0) {
+            a = value;
+        }
+
+        if (i == 1) {
+            b = value;
+        }
+
+        if (i == 2) {
+            c = value;
+        }
+    }
+
+    func main() 
+    {
+        var max: number = 3;
+        var a: number = 0;
+        var b: number = 0;
+        var c: number = 0;
+        var i: number = 0;
+        var temp: number = 0;
+
+        // Set array
+        while (i < max) {
+            temp = i + 42;
+            set_item(i, temp);
+            i = i + 1;
+        }
+
+        // Print array
+        i = 0;
+        while (i < max) {
+            println(get_item(i));
+            i = i + 1;
+        }
+    }
+    """
+    assert run_capture_stdout(src) == "42\n43\n44\n"
