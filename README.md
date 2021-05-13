@@ -113,6 +113,11 @@ The not so interesting part.
   - map inside [cli.py](./smickelscript/cli.py)
   - used `next` in [find_func](./smickelscript/interpreter.py) but I had to remove it to allow for duplicate checking
 
+### Turing completeness
+
+We could write a brainfuck interpreter in this language. Because brainfuck is turing complete it also means that this language is turing complete.
+To write a brainfuck interpreter you only needs arrays, conditions and basic math (addition and subtraction), all these features are supported (in one way or another) in this language.
+
 ### Other functionality
 
 See `statement_exec_map` and `operators_map` at line ~391 inside [interpreter.py](./smickelscript/interpreter.py) for a list of all the implemented functions, and how they are implemented.

@@ -490,12 +490,10 @@ def test_cursed_arrays():
         var b: number = 0;
         var c: number = 0;
         var i: number = 0;
-        var temp: number = 0;
 
         // Set array
         while (i < max) {
-            temp = i + 42;
-            set_item(i, temp);
+            set_item(i, i + 42);
             i = i + 1;
         }
 
