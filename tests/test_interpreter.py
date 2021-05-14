@@ -626,3 +626,25 @@ def test_init_array_with_value():
     }
     """
     assert run_capture_stdout(src) == "[->+<]"
+
+
+def test_array_len():
+    src = """
+    func array_length(a: array) {
+        var len: number = 0;
+        while (true) {
+            # We can't inline the 'a[len]' line in the condition, because this language is shit.
+            var c = a[len];
+            if (c == 0) {
+                return len;
+            }
+            len = len + 1;
+        }
+    }
+
+    func main() {
+        var arr: array[300] = "Hello world";
+        println(array_length(arr));
+    }
+    """
+    assert run_capture_stdout(src) == "11\n"

@@ -356,6 +356,10 @@ def execute_while(
     value, state = execute(ast, token.condition, state, stdout)
     if value:
         retval, state = execute(ast, token.body, state, stdout)
+
+        if retval != None:
+            return retval, state
+
         return execute_while(ast, token, state, stdout)
     return None, state
 
