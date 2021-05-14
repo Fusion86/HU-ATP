@@ -108,6 +108,16 @@ class ArgumentsCloseToken(LexerToken):
         super().__init__(line_nr)
 
 
+class SquareOpenToken(LexerToken):
+    def __init__(self, line_nr: int):
+        super().__init__(line_nr)
+
+
+class SquareCloseToken(LexerToken):
+    def __init__(self, line_nr: int):
+        super().__init__(line_nr)
+
+
 class TypehintToken(LexerToken):
     def __init__(self, line_nr: int):
         super().__init__(line_nr)
@@ -193,6 +203,8 @@ special_character_map = {
     "}": ScopeCloseToken,
     "(": ArgumentsOpenToken,
     ")": ArgumentsCloseToken,
+    "[": SquareOpenToken,
+    "]": SquareCloseToken,
     ":": TypehintToken,
     ";": SemiToken,
     "=": AssignmentToken,
@@ -214,7 +226,7 @@ comparison_operator_map = {
 }
 
 keywords_list = ["if", "else", "func", "return", "true", "false", "var", "while"]
-types_list = ["number", "string", "bool", "void"]
+types_list = ["number", "string", "bool", "void", "array"]
 comment_chars = ["#", "//"]
 
 

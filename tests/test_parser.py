@@ -130,4 +130,65 @@ def test_multi_scope():
     }
     """
     ast = parse(src)
+
+
+def test_str_index():
+    src = """
+    func main() {
+        var a: string = "Hello World";
+        println(a[4]);
+    }
+    """
+    ast = parse(src)
+
+
+def test_str_dynamic_index():
+    src = """
+    func main() {
+        var a: string = "Hello World";
+        var i: number = 3
+        println(a[i]);
+    }
+    """
+    ast = parse(src)
+
+
+def test_init_array():
+    src = """
+    func main() {
+        var a: array[100];
+    }
+    """
+    ast = parse(src)
+
+
+def test_init_array_with_value():
+    src = """
+    func main() {
+        var a: array[100] = "[->+<]";
+    }
+    """
+    ast = parse(src)
     pass
+
+
+def test_access_array():
+    src = """
+    func main() {
+        var a: array[100];
+        println(a[40]);
+    }
+    """
+    ast = parse(src)
+
+
+def test_dynamic_array_error():
+    # This is currently not supported, and therefor should throw an error.
+    src = """
+    func main() {
+        var size: number = 10;
+        var a: array[size];
+    }
+    """
+    with pytest.raises(parser.UnexpectedTokenException):
+        ast = parse(src)

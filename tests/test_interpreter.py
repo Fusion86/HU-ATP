@@ -506,3 +506,123 @@ def test_cursed_arrays():
     }
     """
     assert run_capture_stdout(src) == "42\n43\n44\n"
+
+
+def test_str_index():
+    src = """
+    func main() {
+        var a: string = "Hello World";
+        println(a[4]);
+    }
+    """
+    assert run_capture_stdout(src) == "o\n"
+
+
+def test_str_dynamic_index():
+    src = """
+    func main() {
+        var a: string = "Hello World";
+        var i: number = 3
+        println(a[i]);
+    }
+    """
+    assert run_capture_stdout(src) == "l\n"
+
+
+def test_str_index_out_of_range():
+    src = """
+    func main() {
+        var a: string = "Hello World";
+        println(a[50]);
+    }
+    """
+    with pytest.raises(interpreter.IndexOutOfBoundsException):
+        run_source(src)
+
+
+def test_str_index_negative():
+    src = """
+    func main() {
+        var a: string = "Hello World";
+        println(a[-1]);
+    }
+    """
+    assert run_capture_stdout(src) == "d\n"
+
+
+def test_init_array():
+    src = """
+    func main() {
+        var a: array[100];
+    }
+    """
+    run_source(src)
+
+
+def test_access_zeroed_array():
+    src = """
+    func main() {
+        var a: array[100];
+        println(a[40]);
+    }
+    """
+    assert run_capture_stdout(src) == "0\n"
+
+
+def test_set_array():
+    src = """
+    func main() {
+        var a: array[100];
+        a[40] = "H";
+        a[41] = "e";
+        a[42] = "l";
+        a[43] = "l";
+        a[44] = "o";
+
+        var i: number = 40;
+        while (i <= 44) {
+            print(a[i]);
+            i = i + 1;
+        }
+    }
+    """
+    assert run_capture_stdout(src) == "Hello"
+
+
+def test_set_parent_array():
+    src = """
+    func load_hello() {
+        a[40] = "H";
+        a[41] = "e";
+        a[42] = "l";
+        a[43] = "l";
+        a[44] = "o";
+    }
+
+    func main() {
+        var a: array[100];
+        load_hello();
+
+        var i: number = 40;
+        while (i <= 44) {
+            print(a[i]);
+            i = i + 1;
+        }
+    }
+    """
+    assert run_capture_stdout(src) == "Hello"
+
+
+def test_init_array_with_value():
+    src = """
+    func main() {
+        var a: array[100] = "[->+<]";
+        print(a[0]);
+        print(a[1]);
+        print(a[2]);
+        print(a[3]);
+        print(a[4]);
+        print(a[5]);
+    }
+    """
+    assert run_capture_stdout(src) == "[->+<]"

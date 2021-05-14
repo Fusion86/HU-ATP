@@ -50,6 +50,12 @@ class IllegalTypeException(SmickelRuntimeException):
     pass
 
 
+class IndexOutOfBoundsException(SmickelRuntimeException):
+    """Thrown when an array-like object is accessed at an invalid index."""
+
+    pass
+
+
 class InvalidTypeException(SmickelRuntimeException):
     """Thrown when a given value doesn't match the TypeHint."""
 
@@ -355,6 +361,68 @@ def execute_while(
 
 
 @smickel_trace
+def execute_index_access(
+    ast: List[parser.ParserToken],
+    token: parser.IndexAccessToken,
+    state: ProgramState,
+    stdout: Callable,
+):
+    value, state = execute(ast, token.identifier, state, stdout)
+    idx, state = execute(ast, token.index, state, stdout)
+
+    try:
+        return value[idx], state
+    except IndexError:
+        raise IndexOutOfBoundsException(
+            "Error on line {}. Can't access object at index {}.".format(
+                token.identifier.line_nr, idx
+            )
+        )
+
+
+@smickel_trace
+def execute_init_fixed_size_array(
+    ast: List[parser.ParserToken],
+    token: parser.FixedSizeArrayToken,
+    state: ProgramState,
+    stdout: Callable,
+):
+    size, state = execute(ast, token.size, state, stdout)
+    if token.init_value:
+        val, state = execute(ast, token.init_value, state, stdout)
+        if type(val) == str:
+            chars = list(val)
+
+            if len(chars) > size:
+                raise SmickelRuntimeException(
+                    "Error on line {}. String literal is larger than the array size.".format(
+                        token.init_value.value.line_nr
+                    )
+                )
+            arr = chars + [0] * (size - len(chars))
+            return arr, state
+        else:
+            raise NotImplementedError()
+    else:
+        return [0] * size, state
+
+
+@smickel_trace
+def execute_array_insert(
+    ast: List[parser.ParserToken],
+    token: parser.ArrayInsertToken,
+    state: ProgramState,
+    stdout: Callable,
+):
+    arr = get_var_value(token.array.identifier, state)[:]
+    idx, state = execute(ast, token.array.index, state, stdout)
+    value, state = execute(ast, token.value, state, stdout)
+    arr[idx] = value
+    state = assign_var_value(state, token.array.identifier.value, arr)
+    return None, state
+
+
+@smickel_trace
 def execute_print(
     ast: List[parser.ParserToken],
     statement: parser.FuncCallToken,
@@ -476,6 +544,9 @@ statement_exec_map = {
     parser.IfStatementToken: execute_if,
     parser.ReturnToken: execute_return,
     parser.WhileStatementToken: execute_while,
+    parser.IndexAccessToken: execute_index_access,
+    parser.FixedSizeArrayToken: execute_init_fixed_size_array,
+    parser.ArrayInsertToken: execute_array_insert,
 }
 
 operators_map = {

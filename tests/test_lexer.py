@@ -230,3 +230,41 @@ def test_negative_integers_no_semi():
 
 def test_negative_integers_spacing():
     require_all_equal(["n = n- 1;", "n=n- 1;", "n = n- 1;"])
+
+
+def test_hello_world_str_index():
+    src = """
+    func main() {
+        var a: string = "Hello World";
+        println(a[4]);
+    }
+    """
+    tokens = lexer.tokenize_str(src)
+    assert list(map(type, tokens)) == [
+        # func main() {
+        lexer.KeywordToken,
+        lexer.IdentifierToken,
+        lexer.ArgumentsOpenToken,
+        lexer.ArgumentsCloseToken,
+        lexer.ScopeOpenToken,
+
+        # var a: string = "Hello World";
+        lexer.KeywordToken,
+        lexer.IdentifierToken,
+        lexer.TypehintToken,
+        lexer.TypeToken,
+        lexer.AssignmentToken,
+        lexer.StringLiteralToken,
+        lexer.SemiToken,
+
+        # println(a[4]);
+        lexer.IdentifierToken,
+        lexer.ArgumentsOpenToken,
+        lexer.IdentifierToken,
+        lexer.SquareOpenToken,
+        lexer.NumberLiteralToken,
+        lexer.SquareCloseToken,
+        lexer.ArgumentsCloseToken,
+        lexer.SemiToken,
+        lexer.ScopeCloseToken,
+    ]

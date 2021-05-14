@@ -8,6 +8,8 @@ from typing import List, Tuple, Union, Iterable, Type
 from pprint import pprint
 from smickelscript import lexer
 
+ValOrRefType = Union["LiteralToken", lexer.IdentifierToken]
+
 
 class ParserException(Exception):
     pass
@@ -105,16 +107,36 @@ class UnsetValueToken(ParserToken):
     pass
 
 
+class FixedSizeArrayToken(ParserToken):
+    def __init__(self, size: int, init_value: LiteralToken):
+        self.size = size
+        self.init_value = init_value
+
+
 class InitVariableToken(ParserToken):
-    def __init__(self, identifier: lexer.IdentifierToken, _type: lexer.TypeToken, value):
+    def __init__(
+        self, identifier: lexer.IdentifierToken, _type: lexer.TypeToken, value: ValOrRefType
+    ):
         self.identifier = identifier
         self.variable_type = _type
         self.value = value
 
 
 class AssignVariableToken(ParserToken):
-    def __init__(self, identifier: lexer.IdentifierToken, value):
+    def __init__(self, identifier: lexer.IdentifierToken, value: ValOrRefType):
         self.identifier = identifier
+        self.value = value
+
+
+class IndexAccessToken(ParserToken):
+    def __init__(self, identifier: lexer.IdentifierToken, index: ValOrRefType):
+        self.identifier = identifier
+        self.index = index
+
+
+class ArrayInsertToken(ParserToken):
+    def __init__(self, array: IndexAccessToken, value: ValOrRefType):
+        self.array = array
         self.value = value
 
 
@@ -297,8 +319,21 @@ def parse_identifier_action(
         token = OperatorToken(token, operator, rhs)
 
     # Is this just a ValueLiteral?
-    if isinstance(token, lexer.LiteralToken):
+    elif isinstance(token, lexer.LiteralToken):
         return LiteralToken(token), tokens
+
+    # Is this an array like object?
+    elif isinstance(tokens[0], lexer.SquareOpenToken):
+        _, tokens = eat_one(tokens, lexer.SquareOpenToken)
+        idx, tokens = parse_identifier_action(tokens)
+        _, tokens = eat_one(tokens, lexer.SquareCloseToken)
+        token = IndexAccessToken(token, idx)
+
+        # Is it an assignment, or a 'get' action?
+        assignment, tokens = eat_one(tokens, lexer.AssignmentToken, False)
+        if assignment:
+            value, tokens = parse_identifier_action(tokens)
+            token = ArrayInsertToken(token, value)
 
     return token, tokens
 
@@ -361,12 +396,28 @@ def parse_var(tokens: List[lexer.LexerToken]) -> Tuple[InitVariableToken, List[l
     identifier, tokens = eat_one(tokens, lexer.IdentifierToken)
     type_token, tokens = parse_typehint(tokens)
 
-    # Assignment is optional
-    op, tokens = eat_one(tokens, lexer.AssignmentToken, False)
-    if op:
-        value, tokens = parse_token(tokens)
+    # Is this an array initializer?
+    arr, tokens = eat_one(tokens, lexer.SquareOpenToken, False)
+    if arr:
+        size, tokens = eat_one(tokens, lexer.NumberLiteralToken)
+        _, tokens = eat_one(tokens, lexer.SquareCloseToken)
+
+        # Does the array have an init value?
+        assignment, tokens = eat_one(tokens, lexer.AssignmentToken, False)
+
+        if assignment:
+            init_val, tokens = parse_token(tokens)
+        else:
+            init_val = None
+
+        value = FixedSizeArrayToken(LiteralToken(size), init_val)
     else:
-        value = UnsetValueToken()
+        # Assignment is optional
+        op, tokens = eat_one(tokens, lexer.AssignmentToken, False)
+        if op:
+            value, tokens = parse_token(tokens)
+        else:
+            value = UnsetValueToken()
 
     return InitVariableToken(identifier, type_token, value), tokens
 
