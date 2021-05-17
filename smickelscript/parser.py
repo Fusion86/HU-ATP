@@ -29,6 +29,9 @@ class ParserJsonEncoder(json.JSONEncoder):
 
 
 class ParserToken:
+    def __str__(self):
+        return "{}".format(type(self).__name__)
+
     def __repr__(self):
         return "<{}>".format(type(self).__name__)
 

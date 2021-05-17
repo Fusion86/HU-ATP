@@ -4,16 +4,18 @@ import click
 
 @click.group()
 def cli():
-    """Click group."""
+    """SmickelScript command line interface."""
     pass
 
 
 @cli.command()
 @click.argument("args", required=False, nargs=-1)
-@click.option("--input", "-i", type=str, help="Input source file")
+@click.option("--input", "-i", type=str, help="Input source file", required=True)
 @click.option("--entrypoint", "-e", type=str, help="Entrypoint (default is main)", default="main")
 @click.option("--trace/--no-trace", type=bool, help="Show trace logging", default=False)
 def exec(input, entrypoint: str, trace: bool, args):
+    """Execute a SmickelScript file."""
+
     def parse_arg(x: str):
         if len(x) == 0:
             return ""

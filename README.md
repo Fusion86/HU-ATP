@@ -5,13 +5,14 @@ We had to use functional functions, which sometimes suck in Python. So the code 
 
 ## Features
 
-- Three builtin types: string, number and void
+- Five builtin types: number, string, bool, array, and void
 - Two builtin functions: print and println
 - Custom functions with parameters using the `func` keyword
 - If statements
 - While loops
 - Scoped variables, with the option to update a var in a 'parent' scope
 - Fixed size arrays
+- Comments
 - Basic CLI interface (using `python -m smickelscript.cli`)
 
 ## TODO

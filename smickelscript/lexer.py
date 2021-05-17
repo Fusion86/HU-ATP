@@ -26,6 +26,9 @@ class LexerToken:
     def __init__(self, line_nr: int):
         self.line_nr = line_nr
 
+    def __str__(self):
+        return "{}".format(type(self).__name__)
+
     def __repr__(self):
         return "<{}>".format(type(self).__name__)
 
