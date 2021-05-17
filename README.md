@@ -6,7 +6,7 @@ We had to use functional functions, which sometimes suck in Python. So the code 
 ## Features
 
 - Five builtin types: number, string, bool, array, and void
-- Two builtin functions: print and println
+- Three builtin functions: print, println, and rand
 - Custom functions with parameters using the `func` keyword
 - If statements
 - While loops

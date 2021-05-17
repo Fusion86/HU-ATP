@@ -300,6 +300,27 @@ def test_invalid_implicit_string_return():
         run_source(src)
 
 
+def test_invalid_implicit_func_return():
+    src = """
+    func odd(n: number): bool {
+        if(n == 0) { false; }
+        even(n - 1);
+        even(n - 1);
+    }
+
+    func even(n: number): bool {
+    if (n == 0) { true; }
+        // We even support rust-like implicit returns.
+        odd(n - 1)
+    }
+
+    func main() {
+        odd(5);
+    }
+    """
+    with pytest.raises(interpreter.InvalidImplicitReturnException):
+        run_source(src)
+
 def test_init_void_var():
     src = """
     func main() {

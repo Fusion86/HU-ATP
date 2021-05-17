@@ -217,10 +217,13 @@ def execute_scope(
             len(scope.body) != counter + 1
             and type(scope.body[counter]) not in explicit_return_statements
         ):
-            if isinstance(scope.body[counter], lexer.ValueToken):
+            # TODO: Add a `line_nr` getter on ParserToken.
+            if hasattr(scope.body[counter], "line_nr"):
                 line_nr = scope.body[counter].line_nr
-            else:
+            elif hasattr(scope.body[counter], "value"):
                 line_nr = scope.body[counter].value.line_nr
+            elif hasattr(scope.body[counter], "identifier"):
+                line_nr = scope.body[counter].identifier.line_nr
             raise InvalidImplicitReturnException(
                 "Error on line {}. This implicit return statement is not the last statement in its scope.".format(
                     line_nr

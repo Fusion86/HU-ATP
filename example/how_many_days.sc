@@ -10,7 +10,7 @@ func division(a: number, b: number): number {
 
 func main(year: number, month: number, day: number) {
     // Hardcode the current date, because there is no way to get the current date.
-    var now_day = 12;
+    var now_day = 17;
     var now_month = 5;
     var now_year = 2021;
 
