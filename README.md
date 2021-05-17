@@ -11,6 +11,7 @@ We had to use functional functions, which sometimes suck in Python. So the code 
 - If statements
 - While loops
 - Scoped variables, with the option to update a var in a 'parent' scope
+- Fixed size arrays
 - Basic CLI interface (using `python -m smickelscript.cli`)
 
 ## TODO
@@ -116,7 +117,7 @@ The not so interesting part.
 ### Turing completeness
 
 We could write a brainfuck interpreter in this language. Because brainfuck is turing complete it also means that this language is turing complete.
-To write a brainfuck interpreter you only needs arrays, conditions and basic math (addition and subtraction), all these features are supported (in one way or another) in this language.
+To write a brainfuck interpreter you only needs arrays, conditions and basic math (addition and subtraction), all these features are supported in this language.
 
 ### Other functionality
 

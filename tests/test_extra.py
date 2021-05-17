@@ -86,7 +86,7 @@ def test_brainfuck():
     func array_length(a: array) {
         var len: number = 0;
         while (true) {
-            # We can't inline the 'a[len]' line in the condition, because this language is shit.
+            # We can't inline the 'a[len]' line in the condition.
             var c = a[len];
             if (c == 0) {
                 return len;
