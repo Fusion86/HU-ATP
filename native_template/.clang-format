@@ -1,0 +1,15 @@
+UseTab: Never
+IndentWidth: 4
+IndentCaseLabels: true
+BreakBeforeBraces: Attach
+ColumnLimit: 0
+NamespaceIndentation: All
+AllowShortIfStatementsOnASingleLine: true
+AllowShortBlocksOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Inline
+CompactNamespaces: true
+PointerAlignment: Left
+SortIncludes: false
+FixNamespaceComments: true
+IndentExternBlock: Indent
