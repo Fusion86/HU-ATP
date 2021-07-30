@@ -1,11 +1,11 @@
 #include <Arduino.h>
 
 extern "C" {
-    void smickel_print(const char* str) {
+    void print(const char* str) {
         Serial.print(str);
     }
 
-    void smickel_println(const char* str) {
+    void println(const char* str) {
         Serial.println(str);
     }
 
@@ -15,7 +15,9 @@ extern "C" {
 void setup() {
     Serial.begin(9600);
 
+    Serial.println("> Executing smickelscript_entry");
     smickelscript_entry();
+    Serial.println("> Finished");
 }
 
 void loop() {}
