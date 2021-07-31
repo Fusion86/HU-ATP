@@ -1,12 +1,16 @@
 #include <Arduino.h>
 
 extern "C" {
-    void print(const char* str) {
+    void print_str(const char* str) {
         Serial.print(str);
     }
 
-    void println(const char* str) {
+    void println_str(const char* str) {
         Serial.println(str);
+    }
+
+    void println_integer(int i) {
+        Serial.println(i);
     }
 
     void smickelscript_entry();

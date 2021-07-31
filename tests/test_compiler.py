@@ -25,10 +25,10 @@ def test_odd_even():
     }
 
     func main() {
-        println(odd(4));
-        println(odd(5));
-        println(even(4));
-        println(even(5));
+        println_integer(odd(4));
+        println_integer(odd(5));
+        println_integer(even(4));
+        println_integer(even(5));
     }
     """
     asm = compile_source(src)
