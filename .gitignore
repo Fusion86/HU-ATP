@@ -4,4 +4,5 @@ __pycache__/
 
 .vscode/
 .pytest_cache/
-dump_code.s
+*.s
+*.log
