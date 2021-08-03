@@ -59,7 +59,7 @@ class FuncCallToken(ParserToken):
 
 
 class OperatorToken(ParserToken):
-    def __init__(self, lhs: ParserToken, operator: ParserToken, rhs: ParserToken):
+    def __init__(self, lhs: ParserToken, operator: lexer.OperatorToken, rhs: ParserToken):
         self.lhs = lhs
         self.operator = operator
         self.rhs = rhs

@@ -25,12 +25,56 @@ def assert_environment():
         raise Exception("No Arduino microcontroller connected.")
 
 
-def run_assembler_and_linker(code):
+def run_native(code):
+    # Based on https://stackoverflow.com/a/4896288/2125072
+
+    def enqueue_output(out, queue):
+        for line in iter(out.readline, b""):
+            queue.put(line)
+        out.close()
+
     root = os.path.dirname(os.path.realpath(__file__))
     cwd = os.path.join(root, "..", "native_template")
 
     dump_code(code, os.path.join(cwd, "src", "codegen.s"))
-    subprocess.check_output(["pio", "run", "--environment", "due"], cwd=cwd)
+
+    cmd = "pio run --target upload --target monitor --environment due"
+    process = subprocess.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=STDOUT, cwd=cwd)
+    q = Queue()
+    t = Thread(target=enqueue_output, args=(process.stdout, q))
+    t.daemon = True
+    t.start()
+
+    started = False
+    finished = False
+    output = ""
+
+    with open("test.log", "w") as f:
+        while True:
+            try:
+                line = q.get(timeout=5)
+            except Empty:
+                print("No output within timeout, exiting.")
+                break
+            else:
+                line = line.decode("utf-8").replace("\r", "")
+                sys.stdout.write(line)
+                f.write(line)
+
+                if line == "> Finished\n":
+                    finished = True
+                    break
+                elif started:
+                    output += line
+                elif line == "> Executing smickelscript_entry\n":
+                    started = True
+
+    process.terminate()
+    process.wait()
+
+    assert started, "Program never started"
+    assert finished, "Program never finished"
+    return output
 
 
 def test_println_string_const():
@@ -38,7 +82,8 @@ def test_println_string_const():
 
     src = """func main() { println_str("Hello World"); }"""
     asm = compile_source(src)
-    run_assembler_and_linker(asm)
+    output = run_native(asm)
+    assert output == "Hello World\n"
 
 
 def test_odd_even():
@@ -63,7 +108,8 @@ def test_odd_even():
     }
     """
     asm = compile_source(src)
-    run_assembler_and_linker(asm)
+    output = run_native(asm)
+    assert output == "0\n1\n1\n0\n"
 
 
 def test_sommig_5():
@@ -82,7 +128,8 @@ def test_sommig_5():
     }
     """
     asm = compile_source(src)
-    run_assembler_and_linker(asm)
+    output = run_native(asm)
+    assert output == "15\n"
 
 
 def test_sommig_10():
@@ -101,4 +148,5 @@ def test_sommig_10():
     }
     """
     asm = compile_source(src)
-    run_assembler_and_linker(asm)
+    output = run_native(asm)
+    assert output == "55\n"

@@ -19,11 +19,14 @@ We had to use functional functions, which sometimes suck in Python. So the code 
 
 Some things which could be improved. The language is "Jan-Complete" at the moment, which means that it should be enough to pass the course.
 
-- Better debugging (trace state changes?)
+- [interpreter] Better debugging (trace state changes?)
 - Better error message when a function is missing a return statement (but a return typehint is given), see `test_main_number_no_return`
-- Some interesting example code
+- [compiler] Some data could be saved in `.RODATA` instead of `.DATA`
+- [compiler] Access variables in a higher stack layer (just like is possible with the interpreter).
+- [compiler] Optimize `mov` statements. There are a lot of `mov` statements which could be removed/optimized.
+- [compiler] Remove duplicate return (`pop { ... }`) statements.
 
-## Usage
+## Interpreter Usage
 
 ```sh
 # Install the package
@@ -41,6 +44,10 @@ python -m smickelscript.cli exec -i example/multi_args.sc Wouter "How are you?"
 # Or call a different entry point
 python -m smickelscript.cli exec -i example/functions.sc -e sommig 5
 ```
+
+## Compiler Usage
+
+Todo...
 
 ## About the language
 
@@ -76,6 +83,20 @@ Guessing means that it will try to parse it as a number, and if that doesn't wor
 ### Interpreter
 
 The interpreter will print all `print` and `println` output to the stdout. It will also print the return value of the entry point function (which may be None).
+
+### Compiler
+
+The compiler transforms your smickelscript source code into ARM Cortex-M0 assembly code.
+When then use the PlatformIO toolkit to compile and flash this code.
+
+The compiler has a few limitations compared to the interperter:
+
+- A function can have at most one argument. This is not a technical limitation, but it keeps the compiler code a lot simpler.
+- You can only have 4 local variables in each scope (aka function). This too keeps the compiler's code significantly less complex.
+- The println function is divided into multiple functions. These functions are `print_integer`, `print_str`, `println_integer`, `println_str`.
+- A `bool` type variable is translated into a int `0` or `1` by the compiler, this also means that you have to use either `print_integer` or `println_integer` to print a bool variable.
+- The compiler doesn't do a lot of 'logic checking', this means that the usually compiler won't stop you from writing stupid code.
+- You can't access variables in a higher stack layer. `if` and `while` statements do NOT create a new stack layer.
 
 ## Tests
 

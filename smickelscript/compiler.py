@@ -21,9 +21,15 @@ class UndefinedVariableException(SmickelCompilerException):
     pass
 
 
+class IllegalTypeException(SmickelCompilerException):
+    """Thrown when an illegal type is encounter, for example when intializing a void variable."""
+
+    pass
+
+
 class AsmData:
-    def __init__(self, literal_values=None, stack=None):
-        self.literal_values = literal_values or {}
+    def __init__(self, data=None, stack=None):
+        self.data = data or {}
         self.stack = stack or []
 
 
@@ -45,9 +51,7 @@ def compile(ast: List[parser.ParserToken], data: AsmData = None):
         return compile(ast[1:], data) + src
 
     full_src = ".cpu cortex-m0\n.align 2\n\n.data\n\n"
-    full_src += "\n".join(
-        [declare_variable(x, data.literal_values[x]) for x in data.literal_values]
-    )
+    full_src += "\n".join([declare_variable(x, data.data[x]) for x in data.data])
     full_src += "\n\n.text\n.global smickelscript_entry\n"
     full_src += src
     return full_src
@@ -64,7 +68,7 @@ def compile_token(statement: parser.ParserToken, data: AsmData):
 
 
 def compile_func(statement: parser.FunctionToken, data: AsmData):
-    data = AsmData(data.literal_values.copy(), data.stack[:])
+    data = AsmData(data.data.copy(), data.stack[:])
 
     # Rename main to smickel_main
     func_name = statement.identifier.value
@@ -96,14 +100,14 @@ def compile_func(statement: parser.FunctionToken, data: AsmData):
 
 
 def compile_func_call(token: parser.FuncCallToken, data: AsmData):
-    data = AsmData(data.literal_values.copy(), data.stack[:])
+    data = AsmData(data.data.copy(), data.stack[:])
 
     def compile_push_var(nr, var):
         if type(var) == parser.OperatorToken or type(var) == parser.FuncCallToken:
             return compile_token(var, data)[0]
         elif type(var.value) == lexer.StringLiteralToken:
-            var_name = f"lit_{len(data.literal_values)}"
-            data.literal_values[var_name] = ["asciz", var.value.value]
+            var_name = f"lit_{len(data.data)}"
+            data.data[var_name] = ["asciz", var.value.value]
             dbg = f"  @ Loading variable ({nr}, {type(var.value).__name__}) on line {var.value.line_nr}\n"
             return dbg + f"  ldr r{nr}, ={var_name}\n"
         elif type(var.value) == lexer.NumberLiteralToken:
@@ -121,10 +125,17 @@ def compile_func_call(token: parser.FuncCallToken, data: AsmData):
     return src, data
 
 
-def compile_literal(token: parser.LiteralToken, data: AsmData):
-    if type(token.value) == lexer.BoolLiteralToken:
-        return f"  mov r0, #{1 if token.value.value == 'true' else 0}\n", data
-    raise NotImplementedError()
+def compile_literal(token: parser.LiteralToken, data: AsmData, register="r0"):
+    value_type = type(token.value)
+    if value_type == lexer.BoolLiteralToken:
+        return f"  mov {register}, #{1 if token.value.value == 'true' else 0}\n", data
+    elif value_type == lexer.NumberLiteralToken:
+        return f"  mov {register}, #{token.value.value}\n", data
+    raise NotImplementedError(
+        "Error on line {}. Literal of type {} is not implemented.".format(
+            token.value.line_nr, value_type.__name__
+        )
+    )
 
 
 def compile_scope(scope: parser.ScopeWithBody, data: AsmData, create_stack_layer=False, counter=0):
@@ -182,21 +193,107 @@ def compile_if_statement(token: parser.IfStatementToken, data: AsmData):
         raise NotImplementedError("Condition not implemented.")
 
 
-def compile_operator(token: parser.OperatorToken, data: AsmData):
+def compile_operator(token: parser.OperatorToken, data: AsmData, dst_register="r0"):
     src_load_lhs, data = compile_load_var("r0", token.lhs, data)
     src_load_rhs, data = compile_load_var("r1", token.rhs, data)
     if isinstance(token.operator, lexer.ComparisonToken):
         src_condition = "  cmp r0, r1\n"
     elif isinstance(token.operator, lexer.SubtractionToken):
-        src_condition = "  sub r0, r0, r1\n"
+        src_condition = f"  sub {dst_register}, r0, r1\n"
+    elif isinstance(token.operator, lexer.AdditionToken):
+        src_condition = f"  add {dst_register}, r0, r1\n"
     else:
-        raise NotImplementedError("Operator not implemented.")
-    return src_load_lhs + src_load_rhs + src_condition, data
+        raise NotImplementedError(
+            "Error on line {}. Operator '{}' is not implemented.".format(
+                token.operator.line_nr, token.operator
+            )
+        )
+    dbg = f"  @ {token.operator} on line {token.operator.line_nr}\n"
+    return dbg + src_load_lhs + src_load_rhs + src_condition, data
 
 
 def compile_return_statement(token: parser.ReturnToken, data: AsmData):
     src, data = compile_token(token.value, data)
     return src + "  pop { r4, r5, r6, pc }\n", data
+
+
+def compile_init_var(token: parser.InitVariableToken, data: AsmData):
+    if token.variable_type.type_name == "void":
+        raise IllegalTypeException(
+            "Error on line {}. A variable can't have the type 'void'.".format(
+                token.identifier.line_nr
+            )
+        )
+
+    # Figure out where to save the variable
+    data = AsmData(data.data.copy(), data.stack[:])
+    reg = f"r{4 + len(data.stack[-1])}"
+    data.stack[-1][token.identifier.value] = reg
+
+    src, data = compile_literal(token.value, data, reg)
+    # `token.value.value.value` tragic code :(
+    dbg = f"  @ Init variable '{token.identifier.value}' with value '{token.value.value.value}' on line {token.identifier.line_nr}\n"
+
+    return dbg + src, data
+
+
+def compile_while(token: parser.WhileStatementToken, data: AsmData):
+    while_label = "while_" + secrets.token_hex(5)
+
+    body_src, data = compile_scope(token.body, data)
+    condition_src, data = compile_operator(token.condition, data)
+
+    condition_type = type(token.condition.operator)
+    if condition_type in condition_type_map:
+        op = condition_type_map[condition_type]
+        src_jump_true = f"  {op} {while_label}\n"
+
+        line_nr = token.condition.operator.line_nr
+        src = f"  @ While statement on line {line_nr}\n"
+        src += while_label + ":\n"
+        src += body_src
+        src += condition_src
+        src += src_jump_true
+
+        return src, data
+    else:
+        raise NotImplementedError()
+
+
+def compile_assign_var(token: parser.AssignVariableToken, data: AsmData):
+    data = AsmData(data.data.copy(), data.stack[:])
+
+    # Figure out where to store the result
+    if token.identifier.value in data.stack[-1]:
+        reg = data.stack[-1][token.identifier.value]
+    else:
+        raise SmickelCompilerException(
+            "Variable '{}' not found in the current stack layer. Assigning variables in a higher stack layer is currently not supported.".format(
+                token.identifier.value
+            )
+        )
+
+    # Evaluate the value
+    if isinstance(token.value, parser.OperatorToken):
+        # Optimization to directly store the resulting value in the correct register.
+        src, data = compile_operator(token.value, data, reg)
+    else:
+        # This is less optimized as we need to move the resulting value to the correct register.
+        # It only takes 1 more instruction, but is technically less performant.
+
+        # Evaluate value
+        src, data = compile_token(token.value, data)
+
+        # Store the result in the correct register
+        src += f"  mov {reg}, r0"
+
+    return src, data
+
+
+def compile_identifier(token: lexer.IdentifierToken, data: AsmData):
+    src, value = get_var_value(token, data)
+    dbg = f"  @ Return statement on line {token.line_nr}\n"
+    return dbg + src + f"  mov r0, {value}\n", data
 
 
 def compile_load_var(register, var, data: AsmData):
@@ -236,6 +333,10 @@ token_compilers = {
     parser.FuncCallToken: compile_func_call,
     parser.IfStatementToken: compile_if_statement,
     parser.ReturnToken: compile_return_statement,
+    parser.InitVariableToken: compile_init_var,
+    parser.WhileStatementToken: compile_while,
+    parser.AssignVariableToken: compile_assign_var,
+    lexer.IdentifierToken: compile_identifier,
 }
 
 # This map should return the operator which does the inverse.
@@ -244,9 +345,6 @@ condition_type_map = {
     # lexer.NotEqualToken: "NotImplemented",
     # lexer.GreaterThanToken: "NotImplemented",
     # lexer.SmallerThanToken: "NotImplemented",
-    # lexer.GreaterOrEqualToken: "NotImplemented",
+    lexer.GreaterOrEqualToken: "bge",
     # lexer.SmallerOrEqualToken: "NotImplemented",
 }
-
-if __name__ == "__main__":
-    compile_source("""func main() { println("Hello World"); }""")
