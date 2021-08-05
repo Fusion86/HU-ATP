@@ -47,14 +47,12 @@ def test_hello_world():
 def test_variable_assignment():
     src = "var a = 1;"
     ast = parse(src)
+    assert ast[0].static == False
 
 
 def test_variable_assignment_math():
-    # This is not supported.
     src = "var a = 1 + 2;"
-
-    # with pytest.raises(parser.UnexpectedTokenException):
-    #     ast = parse(src)
+    ast = parse(src)
 
 
 def test_arithmetic():
@@ -169,7 +167,6 @@ def test_init_array_with_value():
     }
     """
     ast = parse(src)
-    pass
 
 
 def test_access_array():
@@ -192,3 +189,9 @@ def test_dynamic_array_error():
     """
     with pytest.raises(parser.UnexpectedTokenException):
         ast = parse(src)
+
+
+def test_global_var():
+    src = "static var a = 5;"
+    ast = parse(src)
+    assert ast[0].static == True

@@ -228,7 +228,7 @@ comparison_operator_map = {
     "<=": SmallerOrEqualToken,
 }
 
-keywords_list = ["if", "else", "func", "return", "true", "false", "var", "while"]
+keywords_list = ["if", "else", "func", "return", "true", "false", "var", "while", "static"]
 types_list = ["number", "string", "bool", "void", "array"]
 comment_chars = ["#", "//"]
 

@@ -13,6 +13,10 @@ extern "C" {
         Serial.println(i);
     }
 
+    void print_int_as_char(int i) {
+        Serial.print((char)i);
+    }
+
     void smickelscript_entry();
 }
 

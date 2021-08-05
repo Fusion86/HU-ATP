@@ -44,5 +44,17 @@ def exec(input, entrypoint: str, trace: bool, args):
         print("> {}".format(ex))
 
 
+@cli.command()
+@click.option("--input", "-i", type=str, help="Input source file", required=True)
+@click.option("--exec", type=bool, help="Show trace logging", default=False)
+def native(input: str, exec: bool):
+    """Compile a SmickelScript file to ARM Cortex-M0 assembly."""
+
+    from smickelscript import compiler
+
+    # TODO: Implement this
+    raise NotImplementedError()
+
+
 if __name__ == "__main__":
     cli()

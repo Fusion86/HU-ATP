@@ -27,20 +27,39 @@ class IllegalTypeException(SmickelCompilerException):
     pass
 
 
+class VariableAlreadyExistsException(SmickelCompilerException):
+    """Thrown when a variable is defined which already exists."""
+
+    pass
+
+
+class EntrypointNotFoundException(SmickelCompilerException):
+    """Thrown when no main function is found."""
+
+    pass
+
+
 class AsmData:
     def __init__(self, data=None, stack=None):
         self.data = data or {}
         self.stack = stack or []
 
 
-def compile_source(source: str) -> str:
-    return compile(parser.load_source(source))
+def compile_to_asm(source: str) -> str:
+    asm = compile(parser.load_source(source))
+
+    if "smickelscript_entry:" not in asm:
+        raise EntrypointNotFoundException("Main function not found.")
+
+    return asm
 
 
 def compile(ast: List[parser.ParserToken], data: AsmData = None):
     def declare_variable(name, value):
-        # TODO: Currently this only works for string literals
-        return f'{name}:\n  .{value[0]} "{value[1]}"'
+        return f"{name}: .{value[0]} {value[1]}"
+
+    if len(ast) == 0:
+        return []
 
     if data == None:
         data = AsmData()
@@ -50,9 +69,14 @@ def compile(ast: List[parser.ParserToken], data: AsmData = None):
     if len(ast) > 1:
         return compile(ast[1:], data) + src
 
-    full_src = ".cpu cortex-m0\n.align 2\n\n.data\n\n"
-    full_src += "\n".join([declare_variable(x, data.data[x]) for x in data.data])
-    full_src += "\n\n.text\n.global smickelscript_entry\n"
+    full_src = ".cpu cortex-m0\n.align 2\n"
+
+    if len(data.data) > 0:
+        full_src += "\n.data\n\n"
+        full_src += "\n".join([declare_variable(x, data.data[x]) for x in data.data])
+        full_src += "\n"
+
+    full_src += "\n.text\n.global smickelscript_entry\n"
     full_src += src
     return full_src
 
@@ -96,6 +120,10 @@ def compile_func(statement: parser.FunctionToken, data: AsmData):
     src = f"\n@ Function {statement.identifier.value} on line {statement.identifier.line_nr}\n"
     src += f"{func_name}:\n"
     src += body_src
+
+    # Also remove the stack layer
+    data.stack = data.stack[:-1]
+
     return src, data
 
 
@@ -103,11 +131,16 @@ def compile_func_call(token: parser.FuncCallToken, data: AsmData):
     data = AsmData(data.data.copy(), data.stack[:])
 
     def compile_push_var(nr, var):
-        if type(var) == parser.OperatorToken or type(var) == parser.FuncCallToken:
+        if type(var) in [
+            parser.OperatorToken,
+            parser.FuncCallToken,
+            lexer.IdentifierToken,
+            parser.IndexAccessToken,
+        ]:
             return compile_token(var, data)[0]
         elif type(var.value) == lexer.StringLiteralToken:
             var_name = f"lit_{len(data.data)}"
-            data.data[var_name] = ["asciz", var.value.value]
+            data.data[var_name] = ["asciz", f'"{var.value.value}"']
             dbg = f"  @ Loading variable ({nr}, {type(var.value).__name__}) on line {var.value.line_nr}\n"
             return dbg + f"  ldr r{nr}, ={var_name}\n"
         elif type(var.value) == lexer.NumberLiteralToken:
@@ -131,6 +164,16 @@ def compile_literal(token: parser.LiteralToken, data: AsmData, register="r0"):
         return f"  mov {register}, #{1 if token.value.value == 'true' else 0}\n", data
     elif value_type == lexer.NumberLiteralToken:
         return f"  mov {register}, #{token.value.value}\n", data
+    elif value_type == lexer.StringLiteralToken:
+        # Unescape values
+        value = bytes(token.value.value, "utf-8").decode("unicode_escape")
+
+        if len(value) > 1:
+            raise SmickelCompilerException(
+                "Error on line {}. Only char literals are supported.".format(token.value.line_nr)
+            )
+        dbg = f"  @ Character literal '{token.value.value}' which is '{ord(value)}' in ASCII\n"
+        return dbg + f"  mov {register}, #{ord(value)}\n", data
     raise NotImplementedError(
         "Error on line {}. Literal of type {} is not implemented.".format(
             token.value.line_nr, value_type.__name__
@@ -140,6 +183,8 @@ def compile_literal(token: parser.LiteralToken, data: AsmData, register="r0"):
 
 def compile_scope(scope: parser.ScopeWithBody, data: AsmData, create_stack_layer=False, counter=0):
     src = ""
+    pop_src = "  pop { r4, r5, r6, pc }\n"
+
     if create_stack_layer and counter == 0:
         # Push registers we are not allowed to change to the stack.
         # Also moves the r0 register (function parameter) to the r4 register,
@@ -149,12 +194,16 @@ def compile_scope(scope: parser.ScopeWithBody, data: AsmData, create_stack_layer
 
     if len(scope.body) <= counter:
         if create_stack_layer:
-            return "  pop { r4, r5, r6, pc }\n", data
+            return pop_src, data
         else:
             return "", data
 
     src_token, data = compile_token(scope.body[counter], data)
     src_rest, data = compile_scope(scope, data, create_stack_layer, counter + 1)
+
+    # Don't add duplicate pop statements when not needed
+    if src_rest == pop_src and src_token.endswith(pop_src):
+        return src + src_token, data
     return src + src_token + src_rest, data
 
 
@@ -208,7 +257,7 @@ def compile_operator(token: parser.OperatorToken, data: AsmData, dst_register="r
                 token.operator.line_nr, token.operator
             )
         )
-    dbg = f"  @ {token.operator} on line {token.operator.line_nr}\n"
+    dbg = f"  @ {str(token.operator).replace('Token', '')} on line {token.operator.line_nr}\n"
     return dbg + src_load_lhs + src_load_rhs + src_condition, data
 
 
@@ -225,39 +274,96 @@ def compile_init_var(token: parser.InitVariableToken, data: AsmData):
             )
         )
 
-    # Figure out where to save the variable
     data = AsmData(data.data.copy(), data.stack[:])
-    reg = f"r{4 + len(data.stack[-1])}"
-    data.stack[-1][token.identifier.value] = reg
 
-    src, data = compile_literal(token.value, data, reg)
-    # `token.value.value.value` tragic code :(
-    dbg = f"  @ Init variable '{token.identifier.value}' with value '{token.value.value.value}' on line {token.identifier.line_nr}\n"
+    # Static variables are saved in the `.DATA` segment, other variables on the stack.
+    if token.static:
+        if token.identifier.value in data.data:
+            raise VariableAlreadyExistsException(
+                "Error on line {}. A variable with the identifier {} already exists.".format(
+                    token.identifier.line_nr, token.identifier.value
+                )
+            )
 
-    return dbg + src, data
+        if type(token.value) == parser.FixedSizeArrayToken:
+            value = ", ".join(["0"] * int(token.value.size.value.value))
+            data.data[token.identifier.value] = ["word", value]
+            return "", data
+
+        if type(token.value) != parser.LiteralToken:
+            raise NotImplementedError(
+                "Error on line {}. This behavior is not implemented.".format(
+                    token.identifier.line_nr
+                )
+            )
+
+        if type(token.value.value) == lexer.StringLiteralToken:
+            data.data[token.identifier.value] = ["asciz", f'"{token.value.value.value}"']
+        elif type(token.value.value) == lexer.NumberLiteralToken:
+            data.data[token.identifier.value] = ["long", token.value.value.value]
+        else:
+            raise NotImplementedError(
+                "Error on line {}. Value type {} is not implemented.".format(
+                    token.identifier.line_nr, token.value.value
+                )
+            )
+
+        return "", data
+    else:
+        if type(token.value) == parser.FixedSizeArrayToken:
+            raise SmickelCompilerException(
+                "Error on line {}. Arrays need to be static.".format(token.identifier.line_nr)
+            )
+
+        # Figure out where to save the variable
+        reg = f"r{4 + len(data.stack[-1])}"
+        data.stack[-1][token.identifier.value] = reg
+
+        if type(token.value) == parser.IndexAccessToken:
+            src, data = compile_array_access(token.value, data, reg)
+            dbg_value_name = f"{token.value.identifier.value}[{token.value.index.value}]"
+            dbg = f"  @ Init variable '{token.identifier.value}' with value '{dbg_value_name}' on line {token.identifier.line_nr}\n"
+        else:
+            src, data = compile_literal(token.value, data, reg)
+            # `token.value.value.value` tragic code :(
+            dbg = f"  @ Init variable '{token.identifier.value}' with value '{token.value.value.value}' on line {token.identifier.line_nr}\n"
+
+        return dbg + src, data
 
 
 def compile_while(token: parser.WhileStatementToken, data: AsmData):
     while_label = "while_" + secrets.token_hex(5)
 
     body_src, data = compile_scope(token.body, data)
-    condition_src, data = compile_operator(token.condition, data)
 
-    condition_type = type(token.condition.operator)
-    if condition_type in condition_type_map:
-        op = condition_type_map[condition_type]
-        src_jump_true = f"  {op} {while_label}\n"
+    if type(token.condition) == parser.LiteralToken:
+        if token.condition.value.value != "true":
+            raise SmickelCompilerException(
+                "Error on line {}. Not supported.".format(token.condition.value.line_nr)
+            )
 
-        line_nr = token.condition.operator.line_nr
-        src = f"  @ While statement on line {line_nr}\n"
+        src = f"  @ While(true) statement on line {token.condition.value.line_nr}\n"
         src += while_label + ":\n"
         src += body_src
-        src += condition_src
-        src += src_jump_true
-
+        src += f"  b {while_label}\n"
         return src, data
     else:
-        raise NotImplementedError()
+        condition_src, data = compile_operator(token.condition, data)
+
+        condition_type = type(token.condition.operator)
+        if condition_type in condition_type_map:
+            op = condition_type_map[condition_type]
+            src_jump_true = f"  {op} {while_label}\n"
+
+            line_nr = token.condition.operator.line_nr
+            src = f"  @ While statement on line {line_nr}\n"
+            src += while_label + ":\n"
+            src += body_src
+            src += condition_src
+            src += src_jump_true
+
+            return src, data
+    raise NotImplementedError()
 
 
 def compile_assign_var(token: parser.AssignVariableToken, data: AsmData):
@@ -292,8 +398,9 @@ def compile_assign_var(token: parser.AssignVariableToken, data: AsmData):
 
 def compile_identifier(token: lexer.IdentifierToken, data: AsmData):
     src, value = get_var_value(token, data)
-    dbg = f"  @ Return statement on line {token.line_nr}\n"
-    return dbg + src + f"  mov r0, {value}\n", data
+    # Only move value to r0 if it isn't already in r0
+    mov = "" if value == "r0" else f"  mov r0, {value}\n"
+    return src + mov, data
 
 
 def compile_load_var(register, var, data: AsmData):
@@ -301,11 +408,43 @@ def compile_load_var(register, var, data: AsmData):
     return src + f"  mov {register}, {value}\n", data
 
 
+def compile_array_insert(token: parser.ArrayInsertToken, data: AsmData):
+    # Used registers:
+    # r0 = ptr where to store the result
+    # r1 = the value to store
+    # r2 = the offset inside the array
+    #
+    # C example:
+    #   r0[r2] = r1
+
+    src_value, data = compile_literal(token.value, data, "r1")
+
+    src = f"  ldr r0, ={token.array.identifier.value}\n"
+    src += src_value
+
+    if type(token.array.index) == parser.LiteralToken:
+        src += f"  mov r2, #{token.array.index.value.value}\n"
+        src += "  str r1, [ r0, r2 ]\n"
+    else:
+        raise NotImplementedError()
+
+    dbg = f"  @ Array insertion on line {token.array.identifier.line_nr}\n"
+    return dbg + src, data
+
+
+def compile_array_access(token: parser.IndexAccessToken, data: AsmData, reg="r0"):
+    tmp = "r1" if reg != "r1" else "r2"
+    src, data = compile_token(token.index, data)
+    src += f"  ldr {tmp}, ={token.identifier.value}\n"
+    src += f"  ldr {reg}, [ r0, {tmp} ]\n"
+    return src, data
+
+
 def get_var_value(token: lexer.ValueToken, data: AsmData):
     def get_value(layer):
         if token.value in layer:
-            # TODO: Also add in which layer this value is
             return "", layer[token.value]
+        return None
 
     if type(token) == parser.LiteralToken:
         if type(token.value) == lexer.NumberLiteralToken:
@@ -315,15 +454,25 @@ def get_var_value(token: lexer.ValueToken, data: AsmData):
         else:
             raise NotImplementedError()
 
-    values = [x for x in map(get_value, data.stack) if x != None]
+    # This commented out code could be used if we allow parent stack access, which
+    # we don't for now.
+    # values = [x for x in map(get_value, data.stack) if x != None]
 
-    if len(values) == 0:
+    # Values in the .DATA segment have priority over local variables.
+    if token.value in data.data:
+        src = f"  ldr r0, ={token.value}\n"
+        src += "  ldr r0, [r0]\n"
+        return src, "r0"
+
+    # The compiler only allows you to access variables in the topmost (current) stack layer
+    value = get_value(data.stack[-1])
+
+    if value == None:
         raise UndefinedVariableException(
             "Error on line {}. Undefined variable '{}'.".format(token.line_nr, token.value)
         )
 
-    # Return the value in the highest/closest stack
-    return values[-1]
+    return value
 
 
 token_compilers = {
@@ -337,14 +486,16 @@ token_compilers = {
     parser.WhileStatementToken: compile_while,
     parser.AssignVariableToken: compile_assign_var,
     lexer.IdentifierToken: compile_identifier,
+    lexer.CommentToken: lambda a, b: ("", b),
+    parser.ArrayInsertToken: compile_array_insert,
+    parser.IndexAccessToken: compile_array_access,
 }
 
-# This map should return the operator which does the inverse.
 condition_type_map = {
     lexer.EqualToken: "beq",
-    # lexer.NotEqualToken: "NotImplemented",
-    # lexer.GreaterThanToken: "NotImplemented",
-    # lexer.SmallerThanToken: "NotImplemented",
+    lexer.NotEqualToken: "bne",
+    lexer.GreaterThanToken: "bgt",
+    lexer.SmallerThanToken: "blt",
     lexer.GreaterOrEqualToken: "bge",
-    # lexer.SmallerOrEqualToken: "NotImplemented",
+    lexer.SmallerOrEqualToken: "ble",
 }

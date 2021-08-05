@@ -247,7 +247,6 @@ def test_hello_world_str_index():
         lexer.ArgumentsOpenToken,
         lexer.ArgumentsCloseToken,
         lexer.ScopeOpenToken,
-
         # var a: string = "Hello World";
         lexer.KeywordToken,
         lexer.IdentifierToken,
@@ -256,7 +255,6 @@ def test_hello_world_str_index():
         lexer.AssignmentToken,
         lexer.StringLiteralToken,
         lexer.SemiToken,
-
         # println(a[4]);
         lexer.IdentifierToken,
         lexer.ArgumentsOpenToken,
@@ -267,4 +265,17 @@ def test_hello_world_str_index():
         lexer.ArgumentsCloseToken,
         lexer.SemiToken,
         lexer.ScopeCloseToken,
+    ]
+
+
+def test_global_var():
+    src = "static var a = 5;"
+    tokens = lexer.tokenize_str(src)
+    assert tokens == [
+        lexer.KeywordToken(1, "static"),
+        lexer.KeywordToken(1, "var"),
+        lexer.IdentifierToken(1, "a"),
+        lexer.AssignmentToken(1),
+        lexer.NumberLiteralToken(1, "5"),
+        lexer.SemiToken(1),
     ]

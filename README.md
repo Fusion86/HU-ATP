@@ -22,9 +22,9 @@ Some things which could be improved. The language is "Jan-Complete" at the momen
 - [interpreter] Better debugging (trace state changes?)
 - Better error message when a function is missing a return statement (but a return typehint is given), see `test_main_number_no_return`
 - [compiler] Some data could be saved in `.RODATA` instead of `.DATA`
-- [compiler] Access variables in a higher stack layer (just like is possible with the interpreter).
 - [compiler] Optimize `mov` statements. There are a lot of `mov` statements which could be removed/optimized.
-- [compiler] Remove duplicate return (`pop { ... }`) statements.
+- [compiler] Could've used AsmTokens instead of raw assembly strings.
+- [compiler] Add byte arrays (useful for ASCII strings).
 
 ## Interpreter Usage
 
@@ -62,7 +62,7 @@ The first example is invalid code, and the second is valid code.
 All variables in the stack are readable and writeable by all functions.
 For example the following snippet is valid code.
 
-```
+```ts
 func main() {
     var a = 0;
     incr_a();
@@ -93,6 +93,7 @@ The compiler has a few limitations compared to the interperter:
 
 - A function can have at most one argument. This is not a technical limitation, but it keeps the compiler code a lot simpler.
 - You can only have 4 local variables in each scope (aka function). This too keeps the compiler's code significantly less complex.
+- Each element of an array is 4 bytes large. This means that you can't call `print` and `println` on arrays, you can however use `print_int_as_char` to print an integer (element of the array) as an ASCII character.
 - The println function is divided into multiple functions. These functions are `print_integer`, `print_str`, `println_integer`, `println_str`.
 - A `bool` type variable is translated into a int `0` or `1` by the compiler, this also means that you have to use either `print_integer` or `println_integer` to print a bool variable.
 - The compiler doesn't do a lot of 'logic checking', this means that the usually compiler won't stop you from writing stupid code.

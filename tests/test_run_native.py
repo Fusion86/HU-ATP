@@ -1,87 +1,12 @@
-import os
-import sys
-import signal
-import subprocess
-from threading import Thread
-from queue import Queue, Empty
-from subprocess import PIPE, STDOUT
-from smickelscript.compiler import compile_source
-
-
-def dump_code(code, dst="dump_code.s"):
-    with open(dst, "w") as f:
-        f.write(code)
-
-
-def assert_environment():
-    # Check if pio is installed
-    try:
-        subprocess.call(["pio"])
-    except FileNotFoundError:
-        raise Exception("PlatformIO not found.")
-
-    pio_device_list_output = subprocess.check_output(["pio", "device", "list"]).decode("utf-8")
-    if "Description: Arduino" not in pio_device_list_output:
-        raise Exception("No Arduino microcontroller connected.")
-
-
-def run_native(code):
-    # Based on https://stackoverflow.com/a/4896288/2125072
-
-    def enqueue_output(out, queue):
-        for line in iter(out.readline, b""):
-            queue.put(line)
-        out.close()
-
-    root = os.path.dirname(os.path.realpath(__file__))
-    cwd = os.path.join(root, "..", "native_template")
-
-    dump_code(code, os.path.join(cwd, "src", "codegen.s"))
-
-    cmd = "pio run --target upload --target monitor --environment due"
-    process = subprocess.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=STDOUT, cwd=cwd)
-    q = Queue()
-    t = Thread(target=enqueue_output, args=(process.stdout, q))
-    t.daemon = True
-    t.start()
-
-    started = False
-    finished = False
-    output = ""
-
-    with open("test.log", "w") as f:
-        while True:
-            try:
-                line = q.get(timeout=5)
-            except Empty:
-                print("No output within timeout, exiting.")
-                break
-            else:
-                line = line.decode("utf-8").replace("\r", "")
-                sys.stdout.write(line)
-                f.write(line)
-
-                if line == "> Finished\n":
-                    finished = True
-                    break
-                elif started:
-                    output += line
-                elif line == "> Executing smickelscript_entry\n":
-                    started = True
-
-    process.terminate()
-    process.wait()
-
-    assert started, "Program never started"
-    assert finished, "Program never finished"
-    return output
+from smickelscript.compiler import compile_to_asm
+from smickelscript.native_helper import assert_environment, run_native
 
 
 def test_println_string_const():
     assert_environment()
 
     src = """func main() { println_str("Hello World"); }"""
-    asm = compile_source(src)
+    asm = compile_to_asm(src)
     output = run_native(asm)
     assert output == "Hello World\n"
 
@@ -107,7 +32,7 @@ def test_odd_even():
         println_integer(even(5));
     }
     """
-    asm = compile_source(src)
+    asm = compile_to_asm(src)
     output = run_native(asm)
     assert output == "0\n1\n1\n0\n"
 
@@ -127,7 +52,7 @@ def test_sommig_5():
         println_integer(sommig(5));
     }
     """
-    asm = compile_source(src)
+    asm = compile_to_asm(src)
     output = run_native(asm)
     assert output == "15\n"
 
@@ -147,6 +72,117 @@ def test_sommig_10():
         println_integer(sommig(10));
     }
     """
-    asm = compile_source(src)
+    asm = compile_to_asm(src)
     output = run_native(asm)
     assert output == "55\n"
+
+
+def test_global_var():
+    src = """
+    static var a = 5432;
+
+    func b() {
+        println_integer(a);
+    }
+
+    func main() {
+        b();
+    }
+    """
+    asm = compile_to_asm(src)
+    output = run_native(asm)
+    assert output == "5432\n"
+
+
+def test_arithmetic_sub():
+    src = """
+    func main() {
+        var a = 5;
+        a = a - 1;
+        println_integer(a);
+    }
+    """
+    asm = compile_to_asm(src)
+    output = run_native(asm)
+    assert output == "4\n"
+
+
+def test_nested_call_hell():
+    src = """
+    func a(n: number) { return b(n + 1); }
+    func b(n: number) { return c(n + 1); }
+    func c(n: number) { return d(n + 1); }
+    func d(n: number) { return n + 1; }
+
+    func main() {
+        println_integer(a(4));
+    }
+    """
+    asm = compile_to_asm(src)
+    output = run_native(asm)
+    assert output == "8\n"
+
+
+def test_set_array():
+    src = """
+    func main() {
+        static var a: array[100];
+        a[40] = "H";
+        a[41] = "e";
+        a[42] = "l";
+        a[43] = "l";
+        a[44] = "o";
+        a[45] = "\\n";
+
+        var i: number = 40;
+        while (i <= 45) {
+            print_int_as_char(a[i]);
+            i = i + 1;
+        }
+    }
+    """
+    asm = compile_to_asm(src)
+    output = run_native(asm)
+    assert output == "Hello\n"
+
+
+def test_array_len():
+    src = """
+    func array_length() {
+        var len: number = 0;
+        while (true) {
+            # We can't inline the 'a[len]' line in the condition, because this language is shit.
+            var c = a[len];
+            if (c == 0) {
+                return len;
+            }
+            len = len + 1;
+        }
+    }
+
+    func main() {
+        static var a: array[300] = "Hello world";
+        println_integer(array_length());
+    }
+    """
+    asm = compile_to_asm(src)
+    output = run_native(asm)
+    assert output == "11\n"
+
+
+def test_var_inside_while():
+    src = """
+    func main()
+    {
+        var a = 0;
+        while (a < 10) {
+            var b = 0;
+            a = a + 1;
+            print_str("-");
+        }
+        println_str("");
+    }
+    """
+    asm = compile_to_asm(src)
+    output = run_native(asm)
+    assert output == "----------\n"

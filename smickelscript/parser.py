@@ -118,11 +118,12 @@ class FixedSizeArrayToken(ParserToken):
 
 class InitVariableToken(ParserToken):
     def __init__(
-        self, identifier: lexer.IdentifierToken, _type: lexer.TypeToken, value: ValOrRefType
+        self, identifier: lexer.IdentifierToken, _type: lexer.TypeToken, value: ValOrRefType, static: False,
     ):
         self.identifier = identifier
         self.variable_type = _type
         self.value = value
+        self.static = static
 
 
 class AssignVariableToken(ParserToken):
@@ -395,6 +396,9 @@ def parse_var(tokens: List[lexer.LexerToken]) -> Tuple[InitVariableToken, List[l
         Tuple[InitVariableToken, List[lexer.LexerToken]]: A tuple with the parsed token, and the rest of the tokens that still need to be parsed.
     """
 
+    # Eat optional static keyword
+    static_token, tokens = eat_one(tokens, lexer.KeywordToken, False, "static")
+
     _, tokens = eat_one(tokens, lexer.KeywordToken, with_value="var")
     identifier, tokens = eat_one(tokens, lexer.IdentifierToken)
     type_token, tokens = parse_typehint(tokens)
@@ -422,7 +426,7 @@ def parse_var(tokens: List[lexer.LexerToken]) -> Tuple[InitVariableToken, List[l
         else:
             value = UnsetValueToken()
 
-    return InitVariableToken(identifier, type_token, value), tokens
+    return InitVariableToken(identifier, type_token, value, static_token != None), tokens
 
 
 def parse_while(
@@ -650,6 +654,7 @@ keyword_parsers = {
     "false": parse_bool_literal,
     "var": parse_var,
     "while": parse_while,
+    "static": parse_var,
 }
 
 
