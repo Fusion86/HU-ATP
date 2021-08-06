@@ -107,6 +107,48 @@ def test_arithmetic_sub():
     assert output == "4\n"
 
 
+def test_manual_division():
+    src = """
+    static var a = 0;
+    static var b = 0;
+
+    func division(): number {
+        var c: number = 0;
+        a = a - b;
+        while (a >= 0) {
+            a = a - b;
+            c = c + 1;
+        }
+        return c;
+    }
+
+    func main() {
+        a = 10;
+        b = 1;
+        println_integer(division());
+        
+        a = 10;
+        b = 2;
+        println_integer(division());
+        
+        a = 10;
+        b = 5;
+        println_integer(division());
+        
+        a = 10;
+        b = 10;
+        println_integer(division());
+        
+        a = 10;
+        b = 20;
+        println_integer(division());
+    }
+    """
+    asm = compile_to_asm(src)
+    output = run_native(asm)
+    assert output == "10\n5\n2\n1\n0\n"
+
+
 def test_nested_call_hell():
     src = """
     func a(n: number) { return b(n + 1); }
@@ -175,14 +217,34 @@ def test_var_inside_while():
     func main()
     {
         var a = 0;
-        while (a < 10) {
+        while (a < 4) {
             var b = 0;
+            b = b + 1;
             a = a + 1;
-            print_str("-");
+            println_integer(b);
         }
-        println_str("");
+        println_integer(a);
     }
     """
     asm = compile_to_asm(src)
     output = run_native(asm)
-    assert output == "----------\n"
+    assert output == "1\n1\n1\n1\n4\n"
+
+
+def test_var_inside_while_access_outside():
+    src = """
+    func main()
+    {
+        var a = 0;
+        if (a != 0) {
+            var b = 5;
+        }
+        if (a == 0) {
+            var b = 10;
+        }
+        println_integer(b);
+    }
+    """
+    asm = compile_to_asm(src)
+    output = run_native(asm)
+    assert output == "10\n"

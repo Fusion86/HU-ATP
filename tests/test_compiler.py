@@ -120,7 +120,10 @@ def test_arithmetic_sub():
 
 def test_manual_division():
     src = """
-    func division(a: number, b: number): number {
+    static var a = 0;
+    static var b = 0;
+
+    func division(): number {
         var c: number = 0;
         a = a - b;
         while (a >= 0) {
@@ -131,11 +134,25 @@ def test_manual_division():
     }
 
     func main() {
-        println_integer(division(10,1));
-        println_integer(division(10,2));
-        println_integer(division(10,3));
-        println_integer(division(10,10));
-        println_integer(division(10,20));
+        a = 10;
+        b = 1;
+        println_integer(division());
+        
+        a = 10;
+        b = 2;
+        println_integer(division());
+        
+        a = 10;
+        b = 5;
+        println_integer(division());
+        
+        a = 10;
+        b = 10;
+        println_integer(division());
+        
+        a = 10;
+        b = 20;
+        println_integer(division());
     }
     """
     asm = compile_to_asm(src)
@@ -223,6 +240,56 @@ def test_array_len():
     func main() {
         static var a: array[300] = "Hello world";
         println_integer(array_length());
+    }
+    """
+    asm = compile_to_asm(src)
+    compile_asm(asm)
+
+
+def test_var_inside_while():
+    src = """
+    func main()
+    {
+        var a = 0;
+        while (a != 0) {
+            var b = 5;
+        }
+        println_integer(b);
+    }
+    """
+    asm = compile_to_asm(src)
+    compile_asm(asm)
+
+
+def test_var_limit():
+    src = """
+    func main()
+    {
+        var a = 0;
+        var b = 0;
+        var c = 0;
+
+        if (a != 0) {
+            var d = 0;
+            var e = 0;
+        }
+    }
+    """
+    with pytest.raises(compiler.SmickelCompilerException):
+        compile_to_asm(src)
+
+
+def test_vars():
+    src = """
+    func main()
+    {
+        var a = 0;
+        var b = 0;
+        var c = 0;
+
+        if (a != 0) {
+            var d = 0;
+        }
     }
     """
     asm = compile_to_asm(src)

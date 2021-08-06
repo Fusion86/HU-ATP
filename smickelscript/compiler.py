@@ -107,12 +107,12 @@ def compile_func(statement: parser.FunctionToken, data: AsmData):
         )
 
     # Link parameter names to their registers
-    # Function parameters will be saved in r4 register
+    # Function parameter will be saved in r3 register
     # This could be changed to allow for more registers, but that'd also require changes
     # in other places. I can't really be bothered to support it, so for now you are only
     # allowed to pass one parameter to a function.
     names = [x.identifier.value for x in statement.parameters]
-    registers = [f"r{x+4}" for x in range(0, len(statement.parameters))]
+    registers = [f"r{x+3}" for x in range(0, len(statement.parameters))]
     stack_layer = dict(zip(names, registers))
     data.stack.append(stack_layer)
 
@@ -172,8 +172,8 @@ def compile_literal(token: parser.LiteralToken, data: AsmData, register="r0"):
             raise SmickelCompilerException(
                 "Error on line {}. Only char literals are supported.".format(token.value.line_nr)
             )
-        dbg = f"  @ Character literal '{token.value.value}' which is '{ord(value)}' in ASCII\n"
-        return dbg + f"  mov {register}, #{ord(value)}\n", data
+        dbg = f"  @ Character literal '{token.value.value}'\n"
+        return dbg + f"  mov {register}, #'{token.value.value}'\n", data
     raise NotImplementedError(
         "Error on line {}. Literal of type {} is not implemented.".format(
             token.value.line_nr, value_type.__name__
@@ -187,10 +187,10 @@ def compile_scope(scope: parser.ScopeWithBody, data: AsmData, create_stack_layer
 
     if create_stack_layer and counter == 0:
         # Push registers we are not allowed to change to the stack.
-        # Also moves the r0 register (function parameter) to the r4 register,
+        # Also moves the r0 register (function parameter) to the r3 register,
         # we do this because some instructions change the r0 register which
         # would cause us to lose our parameter value.
-        src += "  push { r4, r5, r6, lr }\n  mov r4, r0\n"
+        src += "  push { r4, r5, r6, lr }\n  mov r3, r0\n"
 
     if len(scope.body) <= counter:
         if create_stack_layer:
@@ -286,7 +286,22 @@ def compile_init_var(token: parser.InitVariableToken, data: AsmData):
             )
 
         if type(token.value) == parser.FixedSizeArrayToken:
-            value = ", ".join(["0"] * int(token.value.size.value.value))
+            array_size = int(token.value.size.value.value)
+
+            if token.value.init_value == None:
+                value = ["0"] * array_size
+            else:
+                if (
+                    type(token.value.init_value) != parser.LiteralToken
+                    or type(token.value.init_value.value) != lexer.StringLiteralToken
+                ):
+                    raise SmickelCompilerException("Array initial value must be a string literal.")
+
+                value = [f"'{x}'" for x in token.value.init_value.value.value]
+                padding_len = array_size - len(value)
+                value += ["0"] * padding_len
+
+            value = ", ".join(value)
             data.data[token.identifier.value] = ["word", value]
             return "", data
 
@@ -315,6 +330,9 @@ def compile_init_var(token: parser.InitVariableToken, data: AsmData):
                 "Error on line {}. Arrays need to be static.".format(token.identifier.line_nr)
             )
 
+        if len(data.stack[-1]) == 4:
+            raise SmickelCompilerException("Variable limit reached.")
+
         # Figure out where to save the variable
         reg = f"r{4 + len(data.stack[-1])}"
         data.stack[-1][token.identifier.value] = reg
@@ -333,6 +351,8 @@ def compile_init_var(token: parser.InitVariableToken, data: AsmData):
 
 def compile_while(token: parser.WhileStatementToken, data: AsmData):
     while_label = "while_" + secrets.token_hex(5)
+    while_cond_label = while_label + "_cond"
+    while_end_label = while_label + "_end"
 
     body_src, data = compile_scope(token.body, data)
 
@@ -357,10 +377,17 @@ def compile_while(token: parser.WhileStatementToken, data: AsmData):
 
             line_nr = token.condition.operator.line_nr
             src = f"  @ While statement on line {line_nr}\n"
-            src += while_label + ":\n"
-            src += body_src
+
+            # Check if condition is true before running the body.
+            src += while_cond_label + ":\n"
             src += condition_src
             src += src_jump_true
+            src += f"  b {while_end_label}\n"
+
+            src += while_label + ":\n"
+            src += body_src
+            src += f"  b {while_cond_label}\n"
+            src += while_end_label + ":\n"
 
             return src, data
     raise NotImplementedError()
@@ -372,9 +399,13 @@ def compile_assign_var(token: parser.AssignVariableToken, data: AsmData):
     # Figure out where to store the result
     if token.identifier.value in data.stack[-1]:
         reg = data.stack[-1][token.identifier.value]
+        store_in_data = False
+    elif token.identifier.value in data.data:
+        reg = "r0"
+        store_in_data = True
     else:
         raise SmickelCompilerException(
-            "Variable '{}' not found in the current stack layer. Assigning variables in a higher stack layer is currently not supported.".format(
+            "Variable '{}' not found. Keep in mind that assigning variables in a higher stack layer is currently not supported.".format(
                 token.identifier.value
             )
         )
@@ -391,7 +422,12 @@ def compile_assign_var(token: parser.AssignVariableToken, data: AsmData):
         src, data = compile_token(token.value, data)
 
         # Store the result in the correct register
-        src += f"  mov {reg}, r0"
+        if reg != "r0":
+            src += f"  mov {reg}, r0\n"
+
+    if store_in_data:
+        src += f"  ldr r1, ={token.identifier.value}\n"
+        src += "  str r0, [ r1 ]\n"
 
     return src, data
 
@@ -424,6 +460,8 @@ def compile_array_insert(token: parser.ArrayInsertToken, data: AsmData):
 
     if type(token.array.index) == parser.LiteralToken:
         src += f"  mov r2, #{token.array.index.value.value}\n"
+        # Multiply by 4 because all arrays have WORD sized elements (aka 4 bytes).
+        src += "  lsl r2, r2, #2\n"
         src += "  str r1, [ r0, r2 ]\n"
     else:
         raise NotImplementedError()
@@ -435,6 +473,8 @@ def compile_array_insert(token: parser.ArrayInsertToken, data: AsmData):
 def compile_array_access(token: parser.IndexAccessToken, data: AsmData, reg="r0"):
     tmp = "r1" if reg != "r1" else "r2"
     src, data = compile_token(token.index, data)
+    # Multiply by 4 because all arrays have WORD sized elements (aka 4 bytes).
+    src += "  lsl r0, r0, #2\n"
     src += f"  ldr {tmp}, ={token.identifier.value}\n"
     src += f"  ldr {reg}, [ r0, {tmp} ]\n"
     return src, data
@@ -460,9 +500,9 @@ def get_var_value(token: lexer.ValueToken, data: AsmData):
 
     # Values in the .DATA segment have priority over local variables.
     if token.value in data.data:
-        src = f"  ldr r0, ={token.value}\n"
-        src += "  ldr r0, [r0]\n"
-        return src, "r0"
+        src = f"  ldr r2, ={token.value}\n"
+        src += "  ldr r2, [ r2 ]\n"
+        return src, "r2"
 
     # The compiler only allows you to access variables in the topmost (current) stack layer
     value = get_value(data.stack[-1])

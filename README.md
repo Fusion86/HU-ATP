@@ -101,13 +101,20 @@ The compiler has a few limitations compared to the interperter:
 
 ## Tests
 
-There are 5 files with tests.
+There are 7 files with tests.
 
 - test_lexer tests the basic functionality of the lexer.
 - test_parser tests the basic functionality of the parser.
 - test_interpreter tests the basic functionality of the interpreter.
 - test_must_haves tests the code samples provided by the course.
 - test_extra tests a few edge cases which aren't (yet) supported by the language. These are optional.
+- test_compiler has tests for the compiler.
+- test_run_native tests the compiled code on actual hardware.
+
+```sh
+# Run a specific test suite.
+python -m pytest tests/test_run_native.py -vv
+```
 
 ## Jan-Completeness
 
