@@ -3,11 +3,11 @@ import sys
 import subprocess
 from threading import Thread
 from queue import Queue, Empty
-from subprocess import PIPE, STDOUT
-from smickelscript.compiler import compile_to_asm
+from subprocess import PIPE, STDOUT, DEVNULL
+from smickelscript.compiler import compile_src
 
 
-def dump_code(code, dst="dump_code.s"):
+def dump_code(code, dst):
     with open(dst, "w") as f:
         f.write(code)
 
@@ -15,16 +15,16 @@ def dump_code(code, dst="dump_code.s"):
 def assert_environment():
     # Check if pio is installed
     try:
-        subprocess.call(["pio"])
+        subprocess.call(["pio"], stdout=DEVNULL, stderr=DEVNULL)
     except FileNotFoundError:
-        raise Exception("PlatformIO not found.")
+        raise RuntimeError("PlatformIO not found.")
 
     pio_device_list_output = subprocess.check_output(["pio", "device", "list"]).decode("utf-8")
     if "Description: Arduino" not in pio_device_list_output:
-        raise Exception("No Arduino microcontroller connected.")
+        raise RuntimeError("No Arduino microcontroller connected.")
 
 
-def run_native(code):
+def run_native(code, print_to_stdout=True, log_to_file=True):
     # Based on https://stackoverflow.com/a/4896288/2125072
 
     def enqueue_output(out, queue):
@@ -35,7 +35,7 @@ def run_native(code):
     root = os.path.dirname(os.path.realpath(__file__))
     cwd = os.path.join(root, "..", "native_template")
 
-    dump_code(code, os.path.join(cwd, "src", "codegen.s"))
+    dump_code(code, os.path.join(cwd, "src", "codegen.S"))
 
     cmd = "pio run --target upload --target monitor --environment due"
     process = subprocess.Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=STDOUT, cwd=cwd)
@@ -48,31 +48,44 @@ def run_native(code):
     finished = False
     output = ""
 
-    with open("native.log", "w") as f:
-        while True:
+    f = None
+    if log_to_file:
+        f = open("native.log", "w")
+
+    while True:
+        try:
+            line = q.get(timeout=5)
+        except Empty:
+            print("No output within timeout, exiting.")
+            break
+        else:
             try:
-                line = q.get(timeout=5)
-            except Empty:
-                print("No output within timeout, exiting.")
-                break
-            else:
                 line = line.decode("utf-8").replace("\r", "")
-                sys.stdout.write(line)
-                f.write(line)
-                f.flush()
+
+                if print_to_stdout:
+                    sys.stdout.write(line)
+
+                if f != None:
+                    f.write(line)
+                    f.flush()
 
                 if line == "> Finished\n":
                     finished = True
                     break
                 elif started:
                     output += line
-                elif line == "> Executing smickelscript_entry\n":
+                elif line == "> Executing user code\n":
                     started = True
                 elif "No device found on" in line:
-                    raise Exception(line)
+                    raise RuntimeError(line)
+            except:
+                pass
 
     process.terminate()
     process.wait()
+
+    if f != None:
+        f.close()
 
     assert started, "Program never started"
     assert finished, "Program never finished"
@@ -83,5 +96,5 @@ def compile_asm(asm):
     root = os.path.dirname(os.path.realpath(__file__))
     cwd = os.path.join(root, "..", "native_template")
 
-    dump_code(asm, os.path.join(cwd, "src", "codegen.s"))
+    dump_code(asm, os.path.join(cwd, "src", "codegen.S"))
     subprocess.check_output(["pio", "run", "--environment", "due"], cwd=cwd)

@@ -1,3 +1,4 @@
+import random
 import secrets
 from typing import List, TypeVar, Tuple, Type, Optional, Callable
 from smickelscript import lexer, parser
@@ -45,16 +46,25 @@ class AsmData:
         self.stack = stack or []
 
 
-def compile_to_asm(source: str) -> str:
-    asm = compile(parser.load_source(source))
+def compile_file(file: str) -> str:
+    asm = compile_ast(parser.load_file(file))
 
-    if "smickelscript_entry:" not in asm:
+    if "smickelscript_codegen_main:" not in asm:
         raise EntrypointNotFoundException("Main function not found.")
 
     return asm
 
 
-def compile(ast: List[parser.ParserToken], data: AsmData = None):
+def compile_src(source: str) -> str:
+    asm = compile_ast(parser.load_source(source))
+
+    if "smickelscript_codegen_main:" not in asm:
+        raise EntrypointNotFoundException("Main function not found.")
+
+    return asm
+
+
+def compile_ast(ast: List[parser.ParserToken], data: AsmData = None):
     def declare_variable(name, value):
         return f"{name}: .{value[0]} {value[1]}"
 
@@ -67,7 +77,7 @@ def compile(ast: List[parser.ParserToken], data: AsmData = None):
     src, data = compile_token(ast[0], data)
 
     if len(ast) > 1:
-        return compile(ast[1:], data) + src
+        return compile_ast(ast[1:], data) + src
 
     full_src = ".cpu cortex-m0\n.align 2\n"
 
@@ -76,7 +86,13 @@ def compile(ast: List[parser.ParserToken], data: AsmData = None):
         full_src += "\n".join([declare_variable(x, data.data[x]) for x in data.data])
         full_src += "\n"
 
-    full_src += "\n.text\n.global smickelscript_entry\n"
+    full_src += "\n.text\n"
+    full_src += ".global smickelscript_codegen_main, smickelscript_codegen_randinit\n"
+    full_src += "\nsmickelscript_codegen_randinit:\n"
+    full_src += "  push { lr }\n"
+    full_src += f"  ldr r0, ={random.getrandbits(32)}\n"
+    full_src += "  bl srand\n"
+    full_src += "  pop { pc }\n"
     full_src += src
     return full_src
 
@@ -94,10 +110,15 @@ def compile_token(statement: parser.ParserToken, data: AsmData):
 def compile_func(statement: parser.FunctionToken, data: AsmData):
     data = AsmData(data.data.copy(), data.stack[:])
 
-    # Rename main to smickel_main
     func_name = statement.identifier.value
     if func_name == "main":
-        func_name = "smickelscript_entry"
+        # Rename main to smickel_main
+        func_name = "smickelscript_codegen_main"
+
+        if len(statement.parameters) > 0:
+            raise SmickelCompilerException(
+                "The main function is not allowed to have any parameters."
+            )
 
     if len(statement.parameters) > 1:
         raise SmickelCompilerException(
@@ -143,18 +164,23 @@ def compile_func_call(token: parser.FuncCallToken, data: AsmData):
             data.data[var_name] = ["asciz", f'"{var.value.value}"']
             dbg = f"  @ Loading variable ({nr}, {type(var.value).__name__}) on line {var.value.line_nr}\n"
             return dbg + f"  ldr r{nr}, ={var_name}\n"
-        elif type(var.value) == lexer.NumberLiteralToken:
-            dbg = f"  @ Loading variable ({nr}, {type(var.value).__name__}) on line {var.value.line_nr}\n"
-            return dbg + f"  mov r{nr}, #{var.value.value}\n"
         else:
-            raise NotImplementedError()
+            dbg = f"  @ Loading variable ({nr}, {type(var.value).__name__}) on line {var.value.line_nr}\n"
+            src, _ = compile_literal(var, data, f"r{nr}")
+            return dbg + src
 
     if len(token.args) > 1:
         raise IllegalFunctionCallException("Can't have more than 1 function arguments.")
 
-    src = f"  @ Function call to {token.identifier.value} on line {token.identifier.line_nr}\n"
+    func_name = token.identifier.value
+
+    # Workaround because C++ has a built in rand function which differs from our expected behavior.
+    if func_name == "rand":
+        func_name = "smickelscript_rand"
+
+    src = f"  @ Function call to {func_name} on line {token.identifier.line_nr}\n"
     src += "\n".join([compile_push_var(k, v) for k, v in enumerate(token.args)])
-    src += f"  bl {token.identifier.value}\n"
+    src += f"  bl {func_name}\n"
     return src, data
 
 
@@ -163,7 +189,9 @@ def compile_literal(token: parser.LiteralToken, data: AsmData, register="r0"):
     if value_type == lexer.BoolLiteralToken:
         return f"  mov {register}, #{1 if token.value.value == 'true' else 0}\n", data
     elif value_type == lexer.NumberLiteralToken:
-        return f"  mov {register}, #{token.value.value}\n", data
+        if int(token.value.value) < 256:
+            return f"  mov {register}, #{token.value.value}\n", data
+        return f"  ldr {register}, ={token.value.value}\n", data
     elif value_type == lexer.StringLiteralToken:
         # Unescape values
         value = bytes(token.value.value, "utf-8").decode("unicode_escape")
@@ -247,10 +275,17 @@ def compile_operator(token: parser.OperatorToken, data: AsmData, dst_register="r
     src_load_rhs, data = compile_load_var("r1", token.rhs, data)
     if isinstance(token.operator, lexer.ComparisonToken):
         src_condition = "  cmp r0, r1\n"
-    elif isinstance(token.operator, lexer.SubtractionToken):
+    elif type(token.operator) == lexer.SubtractionToken:
         src_condition = f"  sub {dst_register}, r0, r1\n"
-    elif isinstance(token.operator, lexer.AdditionToken):
+    elif type(token.operator) == lexer.AdditionToken:
         src_condition = f"  add {dst_register}, r0, r1\n"
+    elif type(token.operator) == lexer.MultiplicationToken:
+        # Destination register **must** be r0 or r1
+        if dst_register in ["r0", "r1"]:
+            src_condition = f"  mul {dst_register}, r0, r1\n"
+        else:
+            src_condition = f"  mul r0, r0, r1\n"
+            src_condition += f"  mov {dst_register}, r0\n"
     else:
         raise NotImplementedError(
             "Error on line {}. Operator '{}' is not implemented.".format(
@@ -305,6 +340,16 @@ def compile_init_var(token: parser.InitVariableToken, data: AsmData):
             data.data[token.identifier.value] = ["word", value]
             return "", data
 
+        if type(token.value) == parser.FuncCallToken:
+            data.data[token.identifier.value] = ["word", "0"]
+            src, data = compile_func_call(token.value, data)
+
+            # Write the result to the .data section (at runtime).
+            src += f"  ldr r1, ={token.identifier.value}\n"
+            src += "  str r0, [ r1 ]\n"
+            dbg = f"  @ Init static variable '{token.identifier.value}' with result from function call to '{token.value.identifier.value}' on line {token.identifier.line_nr}\n"
+            return dbg + src, data
+
         if type(token.value) != parser.LiteralToken:
             raise NotImplementedError(
                 "Error on line {}. This behavior is not implemented.".format(
@@ -341,6 +386,14 @@ def compile_init_var(token: parser.InitVariableToken, data: AsmData):
             src, data = compile_array_access(token.value, data, reg)
             dbg_value_name = f"{token.value.identifier.value}[{token.value.index.value}]"
             dbg = f"  @ Init variable '{token.identifier.value}' with value '{dbg_value_name}' on line {token.identifier.line_nr}\n"
+        elif type(token.value) == parser.FuncCallToken:
+            src, data = compile_func_call(token.value, data)
+
+            # Move result to the correct register
+            if reg != "r0":
+                src += f"  mov {reg}, r0\n"
+
+            dbg = f"  @ Init variable '{token.identifier.value}' with result from function call to '{token.value.identifier.value}' on line {token.identifier.line_nr}\n"
         else:
             src, data = compile_literal(token.value, data, reg)
             # `token.value.value.value` tragic code :(
@@ -426,6 +479,7 @@ def compile_assign_var(token: parser.AssignVariableToken, data: AsmData):
             src += f"  mov {reg}, r0\n"
 
     if store_in_data:
+        src += f"  @ Storing result in static variable '{token.identifier.value}'\n"
         src += f"  ldr r1, ={token.identifier.value}\n"
         src += "  str r0, [ r1 ]\n"
 
@@ -440,6 +494,10 @@ def compile_identifier(token: lexer.IdentifierToken, data: AsmData):
 
 
 def compile_load_var(register, var, data: AsmData):
+    # Shitty workaround for immediate values above 255
+    if type(var.value) == lexer.NumberLiteralToken and int(var.value.value) > 255:
+        return f"  ldr {register}, ={var.value.value}\n", data
+
     src, value = get_var_value(var, data)
     return src + f"  mov {register}, {value}\n", data
 

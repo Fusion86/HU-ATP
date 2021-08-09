@@ -19,7 +19,7 @@
       "program": "${workspaceFolder}/smickelscript/cli.py",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
-      "args": ["exec", "-i", "example/test.sc", "-e", "odd", "5"]
+      "args": ["native", "-i", "example_native/functions.sc",]
     }
   ]
 }

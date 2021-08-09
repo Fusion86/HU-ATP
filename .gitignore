@@ -4,5 +4,6 @@ __pycache__/
 
 .vscode/
 .pytest_cache/
-*.s
+*.S
+!smickelscript.S
 *.log

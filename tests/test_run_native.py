@@ -1,4 +1,4 @@
-from smickelscript.compiler import compile_to_asm
+from smickelscript.compiler import compile_src
 from smickelscript.native_helper import assert_environment, run_native
 
 
@@ -6,7 +6,7 @@ def test_println_string_const():
     assert_environment()
 
     src = """func main() { println_str("Hello World"); }"""
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "Hello World\n"
 
@@ -32,7 +32,7 @@ def test_odd_even():
         println_integer(even(5));
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "0\n1\n1\n0\n"
 
@@ -52,7 +52,7 @@ def test_sommig_5():
         println_integer(sommig(5));
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "15\n"
 
@@ -72,7 +72,7 @@ def test_sommig_10():
         println_integer(sommig(10));
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "55\n"
 
@@ -89,7 +89,7 @@ def test_global_var():
         b();
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "5432\n"
 
@@ -102,7 +102,7 @@ def test_arithmetic_sub():
         println_integer(a);
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "4\n"
 
@@ -144,7 +144,7 @@ def test_manual_division():
         println_integer(division());
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "10\n5\n2\n1\n0\n"
 
@@ -160,7 +160,7 @@ def test_nested_call_hell():
         println_integer(a(4));
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "8\n"
 
@@ -183,7 +183,7 @@ def test_set_array():
         }
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "Hello\n"
 
@@ -207,7 +207,7 @@ def test_array_len():
         println_integer(array_length());
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "11\n"
 
@@ -226,7 +226,7 @@ def test_var_inside_while():
         println_integer(a);
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "1\n1\n1\n1\n4\n"
 
@@ -245,6 +245,107 @@ def test_var_inside_while_access_outside():
         println_integer(b);
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     output = run_native(asm)
     assert output == "10\n"
+
+
+def test_init_var_with_func_result():
+    src = """
+    func odd(n:number):bool {
+        if(n==0) { return false; }
+        return even(n - 1);
+    }
+
+    func even(n: number): bool {
+        if (n == 0) { return true; }
+        // We even support rust-like implicit returns.
+        odd(n - 1);
+    }
+
+    func main()
+    {
+        var odd = odd(5);
+        println_integer(odd);
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "1\n"
+
+
+def test_rust_return():
+    src = """
+    func sommig(n: number): bool {
+        var result = 0
+        while (n >= 1) {
+            result = result + n
+            n = n - 1
+        }
+        result
+    }    
+    
+    func main()
+    {
+        println_integer(sommig(5));
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "15\n"
+
+
+def test_math_mult():
+    src = """
+    func main()
+    {
+        var a = 2;
+        a = a * 5;
+        println_integer(a);
+        a = a * 512;
+        println_integer(a);
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "10\n5120\n"
+
+
+def test_static_var_init():
+    src = """
+    func init() {
+        return 10;
+    }
+
+    func main()
+    {
+        static var a = init();
+        println_integer(a);
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "10\n"
+
+
+def test_var_large_numbers():
+    src = """
+    func main()
+    {
+        var a = 128;
+        println_integer(a);
+        a = 256;
+        println_integer(a);
+        a = 512;
+        println_integer(a);
+        a = 1024;
+        println_integer(a);
+        a = 16384;
+        println_integer(a);
+        a = 524288;
+        println_integer(a);
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "128\n256\n512\n1024\n16384\n524288\n"

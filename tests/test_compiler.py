@@ -1,20 +1,16 @@
 import pytest
 from smickelscript import compiler
-from smickelscript.compiler import compile_to_asm
-from smickelscript.native_helper import assert_environment, compile_asm
+from smickelscript.compiler import compile_src
+from smickelscript.native_helper import compile_asm
 
 
 def test_println_string_const():
-    assert_environment()
-
     src = """func main() { println_str("Hello World"); }"""
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
 def test_odd_even():
-    assert_environment()
-
     src = """
     func odd(n: number): bool {
         if(n == 0) { return false; }
@@ -33,7 +29,7 @@ def test_odd_even():
         println_integer(even(5));
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -52,7 +48,7 @@ def test_sommig_5():
         println_integer(sommig(5));
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -71,7 +67,7 @@ def test_sommig_10():
         println_integer(sommig(10));
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -87,7 +83,7 @@ def test_parent_stack_access():
     }
     """
     with pytest.raises(compiler.UndefinedVariableException):
-        compile_to_asm(src)
+        compile_src(src)
 
 
 def test_global_var():
@@ -102,7 +98,7 @@ def test_global_var():
         b();
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -114,7 +110,7 @@ def test_arithmetic_sub():
         println_integer(a);
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -155,7 +151,7 @@ def test_manual_division():
         println_integer(division());
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -170,7 +166,7 @@ def test_nested_call_hell():
         println_integer(a(4));
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -183,13 +179,13 @@ def test_require_array_static():
     }
     """
     with pytest.raises(compiler.SmickelCompilerException):
-        compile_to_asm(src)
+        compile_src(src)
 
 
 def test_require_main():
     src = ""
     with pytest.raises(compiler.EntrypointNotFoundException):
-        compile_to_asm(src)
+        compile_src(src)
 
 
 def test_init_array():
@@ -197,7 +193,7 @@ def test_init_array():
     static var a: array[100];
     func main() { }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -219,7 +215,7 @@ def test_set_array():
         }
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -242,7 +238,7 @@ def test_array_len():
         println_integer(array_length());
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -257,7 +253,7 @@ def test_var_inside_while():
         println_integer(b);
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
     compile_asm(asm)
 
 
@@ -276,7 +272,7 @@ def test_var_limit():
     }
     """
     with pytest.raises(compiler.SmickelCompilerException):
-        compile_to_asm(src)
+        compile_src(src)
 
 
 def test_vars():
@@ -292,5 +288,103 @@ def test_vars():
         }
     }
     """
-    asm = compile_to_asm(src)
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
+def test_init_var_with_func_result():
+    src = """
+    func odd(n:number):bool {
+        if(n==0) { return false; }
+        return even(n - 1);
+    }
+
+    func even(n: number): bool {
+        if (n == 0) { return true; }
+        // We even support rust-like implicit returns.
+        odd(n - 1);
+    }
+
+    func main()
+    {
+        var odd = odd(5);
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
+def test_disallow_main_func_with_args():
+    src = """
+    func main(name: string): void {
+        print_str("Hello ");
+        println_str(name);
+    }
+    """
+    with pytest.raises(compiler.SmickelCompilerException):
+        compile_src(src)
+
+
+def test_math_mult():
+    src = """
+    func main()
+    {
+        var a = 2;
+        a = a * 5;
+        println_integer(a);
+        a = a * 512;
+        println_integer(a);
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
+def test_static_var_init():
+    src = """
+    func init() {
+        return 10;
+    }
+
+    func main()
+    {
+        static var a = init();
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
+def test_var_large_numbers():
+    src = """
+    func main()
+    {
+        var a = 128;
+        println_integer(a);
+        a = 256;
+        println_integer(a);
+        a = 512;
+        println_integer(a);
+        a = 1024;
+        println_integer(a);
+        a = 16384;
+        println_integer(a);
+        a = 524288;
+        println_integer(a);
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
+def test_unk_error_1():
+    src = """
+    func main()
+    {
+        var res = rand(6);
+        res = res + 1;
+        println_integer(res);
+    }
+    """
+    asm = compile_src(src)
     compile_asm(asm)

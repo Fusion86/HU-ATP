@@ -22,9 +22,10 @@ Some things which could be improved. The language is "Jan-Complete" at the momen
 - [interpreter] Better debugging (trace state changes?)
 - Better error message when a function is missing a return statement (but a return typehint is given), see `test_main_number_no_return`
 - [compiler] Some data could be saved in `.RODATA` instead of `.DATA`
-- [compiler] Optimize `mov` statements. There are a lot of `mov` statements which could be removed/optimized.
+- [compiler] Optimize `mov` statements. There are some `mov` statements which could be removed/optimized.
 - [compiler] Could've used AsmTokens instead of raw assembly strings.
 - [compiler] Add byte arrays (useful for ASCII strings).
+- [compiler] The `print` function could automatically be translated to either `print_str` or `print_integer`.
 
 ## Interpreter Usage
 
@@ -87,16 +88,16 @@ The interpreter will print all `print` and `println` output to the stdout. It wi
 ### Compiler
 
 The compiler transforms your smickelscript source code into ARM Cortex-M0 assembly code.
-When then use the PlatformIO toolkit to compile and flash this code.
+The PlatformIO toolkit is used to compile, flash, and monitor the generated code.
 
 The compiler has a few limitations compared to the interperter:
 
-- A function can have at most one argument. This is not a technical limitation, but it keeps the compiler code a lot simpler.
+- A function can have at most one argument. This is not a technical limitation, but it keeps the compiler's code a lot simpler.
 - You can only have 4 local variables in each scope (aka function). This too keeps the compiler's code significantly less complex.
 - Each element of an array is 4 bytes large. This means that you can't call `print` and `println` on arrays, you can however use `print_int_as_char` to print an integer (element of the array) as an ASCII character.
-- The println function is divided into multiple functions. These functions are `print_integer`, `print_str`, `println_integer`, `println_str`.
-- A `bool` type variable is translated into a int `0` or `1` by the compiler, this also means that you have to use either `print_integer` or `println_integer` to print a bool variable.
-- The compiler doesn't do a lot of 'logic checking', this means that the usually compiler won't stop you from writing stupid code.
+- The println function is divided into multiple functions. These functions are `print_integer`, `print_str`, `println_integer`, `println_str`, and `print_int_as_char`.
+- A `bool` type variable is translated into an int `0` or `1` by the compiler, this also means that you have to use either `print_integer` or `println_integer` to print a bool variable.
+- The compiler doesn't do a lot of 'logic checking', this means that usually compiler won't stop you from writing stupid code.
 - You can't access variables in a higher stack layer. `if` and `while` statements do NOT create a new stack layer.
 
 ## Tests

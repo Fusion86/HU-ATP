@@ -46,14 +46,23 @@ def exec(input, entrypoint: str, trace: bool, args):
 
 @cli.command()
 @click.option("--input", "-i", type=str, help="Input source file", required=True)
-@click.option("--exec", type=bool, help="Show trace logging", default=False)
-def native(input: str, exec: bool):
+@click.option(
+    "--execute", "-e", type=bool, help="Flash and monitor the compiled binary", default=False
+)
+def native(input: str, execute: bool):
     """Compile a SmickelScript file to ARM Cortex-M0 assembly."""
 
     from smickelscript import compiler
+    from smickelscript.native_helper import assert_environment, run_native
 
-    # TODO: Implement this
-    raise NotImplementedError()
+    assert_environment()
+
+    asm = compiler.compile_file(input)
+
+    if execute:
+        run_native(asm)
+    else:
+        print(asm)
 
 
 if __name__ == "__main__":
