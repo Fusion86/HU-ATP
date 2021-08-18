@@ -161,6 +161,11 @@ class MultiplicationToken(ArithmeticToken):
         super().__init__(line_nr)
 
 
+class ModuloToken(ArithmeticToken):
+    def __init__(self, line_nr: int):
+        super().__init__(line_nr)
+
+
 class AssignmentToken(OperatorToken):
     def __init__(self, line_nr: int):
         super().__init__(line_nr)
@@ -217,6 +222,7 @@ arithmetic_operator_map = {
     "+": AdditionToken,
     "-": SubtractionToken,
     "*": MultiplicationToken,
+    "%": ModuloToken,
 }
 
 comparison_operator_map = {

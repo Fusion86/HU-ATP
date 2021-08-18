@@ -242,6 +242,22 @@ def test_array_len():
     compile_asm(asm)
 
 
+def test_array_dynamic_insert():
+    src = """
+    func main() {
+        static var a: array[20];
+        var i = 0;
+
+        while (i < 20) {
+            a[i] = 1;
+            i = i + i;
+        }
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
 def test_var_inside_while():
     src = """
     func main()
@@ -384,6 +400,65 @@ def test_unk_error_1():
         var res = rand(6);
         res = res + 1;
         println_integer(res);
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
+def test_array_insert_dynamic_value():
+    src = """
+    static var a: array[1];
+
+    func main()
+    {
+        str("a");
+    }
+
+    func str(x) {
+        a[0] = x;
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
+def test_if_else():
+    src = """
+    func main()
+    {
+        var a = 4;
+        if (a == 4) {
+            println_str("if");
+        } else {
+            println_str("else");
+        }
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
+def test_modulo():
+    src = """
+    func main()
+    {
+        var a = 4;
+        var b = 0;
+        b = a % 2;
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
+def test_array_insert_from_var():
+    src = """
+    func main()
+    {
+        static var arr: array[10];
+        var value = 4;
+        arr[0] = value;
     }
     """
     asm = compile_src(src)

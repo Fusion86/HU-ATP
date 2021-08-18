@@ -212,6 +212,35 @@ def test_array_len():
     assert output == "11\n"
 
 
+def test_array_dynamic_insert():
+    src = """
+    func main() {
+        static var a: array[20];
+        var i = 0;
+
+        # Dynamically init array
+        while (i < 20) {
+            a[i] = 1;
+            i = i + 1;
+        }
+
+        # Sum array
+        i = 0;
+        var sum = 0;
+        while (i < 20) {
+            var tmp = a[i];
+            sum = sum + tmp;
+            i = i + 1;
+        }
+
+        println_integer(sum);
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "20\n"
+
+
 def test_var_inside_while():
     src = """
     func main()
@@ -349,3 +378,106 @@ def test_var_large_numbers():
     asm = compile_src(src)
     output = run_native(asm)
     assert output == "128\n256\n512\n1024\n16384\n524288\n"
+
+
+def test_arduino_delay():
+    src = """
+    func main()
+    {
+        println_str("Hello");
+        delay(1000);
+        println_str("World");
+    }
+    """
+    asm = compile_src(src)
+    run_native(asm)
+
+
+def test_get_time():
+    src = """
+    func main()
+    {
+        var t = time();
+        println_integer(t);
+        delay(1234);  
+        println_integer(time_ms());
+    }
+    """
+    asm = compile_src(src)
+    run_native(asm)
+
+
+def test_empty_function_bug():
+    src = """
+    func noop() { }
+
+    func main()
+    {
+        println_str("Hello");
+        noop();
+        println_str("World");
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "Hello\nWorld\n"
+
+
+def test_if_else():
+    src = """
+    func main()
+    {
+        var a = 4;
+        if (a == 4) {
+            println_str("if");
+        } else {
+            println_str("else");
+        }
+
+        a = 5;
+        if (a == 4) {
+            println_str("if");
+        } else {
+            println_str("else");
+        }
+        println_str("end");
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "if\nelse\nend\n"
+
+
+def test_modulo():
+    src = """
+    func main()
+    {
+        var a = 5;
+        var b = 0;
+        b = a % 2;
+        println_integer(b);
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "1\n"
+
+def test_array_insert_dynamic_value():
+    src = """
+    static var a: array[1];
+
+    func main()
+    {
+        # You CAN NOT use ";", because that will store the pointer to the string in the array.
+        str(59);
+        print_int_as_char(a[0]);
+        println_str("");
+    }
+
+    func str(x) {
+        a[0] = x;
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == ";\n"

@@ -26,6 +26,7 @@ Some things which could be improved. The language is "Jan-Complete" at the momen
 - [compiler] Could've used AsmTokens instead of raw assembly strings.
 - [compiler] Add byte arrays (useful for ASCII strings).
 - [compiler] The `print` function could automatically be translated to either `print_str` or `print_integer`.
+- [compiler] With large programs you sometimes get errors where the literal pool is out of range for LDR. [More info.](https://developer.arm.com/documentation/dui0497/a/the-cortex-m0-instruction-set/memory-access-instructions/ldr--pc-relative)
 
 ## Interpreter Usage
 

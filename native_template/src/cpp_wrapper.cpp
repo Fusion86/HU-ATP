@@ -29,5 +29,17 @@ extern "C" {
         return random(i);
     }
 
-    void smickelscript_entry();
+    int smickelscript_time() {
+        return millis() / 1000;
+    }
+
+    int smickelscript_time_ms() {
+        return millis();
+    }
+
+    int smickelscript_modulo(int a, int b) {
+        // This could also be implemented in ASM using a repeated subtraction loop.
+        // But I don't want to butcher the performance for code using the modulo operator.
+        return a % b;
+    }
 }

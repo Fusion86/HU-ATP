@@ -118,7 +118,11 @@ class FixedSizeArrayToken(ParserToken):
 
 class InitVariableToken(ParserToken):
     def __init__(
-        self, identifier: lexer.IdentifierToken, _type: lexer.TypeToken, value: ValOrRefType, static: False,
+        self,
+        identifier: lexer.IdentifierToken,
+        _type: lexer.TypeToken,
+        value: ValOrRefType,
+        static: False,
     ):
         self.identifier = identifier
         self.variable_type = _type
@@ -365,9 +369,11 @@ def parse_if_statement(
     # Parse else statement, if it exists
     else_token, tokens = eat_one(tokens, lexer.KeywordToken, False, "else")
     if else_token:
-        raise NotImplementedError("'else' keywords are currently not implemented.")
+        false_body, tokens = parse_scope(tokens)
+    else:
+        false_body = None
 
-    return IfStatementToken(condition, true_body), tokens
+    return IfStatementToken(condition, true_body, false_body), tokens
 
 
 def parse_condition(tokens: List[lexer.LexerToken]) -> Tuple[ParserToken, List[lexer.LexerToken]]:

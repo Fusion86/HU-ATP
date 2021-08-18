@@ -47,7 +47,7 @@ def exec(input, entrypoint: str, trace: bool, args):
 @cli.command()
 @click.option("--input", "-i", type=str, help="Input source file", required=True)
 @click.option(
-    "--execute", "-e", type=bool, help="Flash and monitor the compiled binary", default=False
+    "--execute/--no-execute", type=bool, help="Flash and monitor the compiled binary", default=False
 )
 def native(input: str, execute: bool):
     """Compile a SmickelScript file to ARM Cortex-M0 assembly."""

@@ -90,7 +90,7 @@ def compile_ast(ast: List[parser.ParserToken], data: AsmData = None):
     full_src += ".global smickelscript_codegen_main, smickelscript_codegen_randinit\n"
     full_src += "\nsmickelscript_codegen_randinit:\n"
     full_src += "  push { lr }\n"
-    full_src += f"  ldr r0, ={random.getrandbits(32)}\n"
+    full_src += f"  mov r0, #{random.getrandbits(8)}\n"
     full_src += "  bl srand\n"
     full_src += "  pop { pc }\n"
     full_src += src
@@ -174,9 +174,9 @@ def compile_func_call(token: parser.FuncCallToken, data: AsmData):
 
     func_name = token.identifier.value
 
-    # Workaround because C++ has a built in rand function which differs from our expected behavior.
-    if func_name == "rand":
-        func_name = "smickelscript_rand"
+    # Rename some built in functions because we want to use our own implementation, and not the Arduino implementation.
+    if func_name in ["rand", "time", "time_ms"]:
+        func_name = "smickelscript_" + func_name
 
     src = f"  @ Function call to {func_name} on line {token.identifier.line_nr}\n"
     src += "\n".join([compile_push_var(k, v) for k, v in enumerate(token.args)])
@@ -202,9 +202,13 @@ def compile_literal(token: parser.LiteralToken, data: AsmData, register="r0"):
             )
         dbg = f"  @ Character literal '{token.value.value}'\n"
         return dbg + f"  mov {register}, #'{token.value.value}'\n", data
+
+    # Trash code
+    line_nr = token.line_nr if hasattr(token, "line_nr") else token.value.line_nr
+
     raise NotImplementedError(
         "Error on line {}. Literal of type {} is not implemented.".format(
-            token.value.line_nr, value_type.__name__
+            line_nr, value_type.__name__
         )
     )
 
@@ -222,7 +226,10 @@ def compile_scope(scope: parser.ScopeWithBody, data: AsmData, create_stack_layer
 
     if len(scope.body) <= counter:
         if create_stack_layer:
-            return pop_src, data
+            if counter > 0:
+                return pop_src, data
+            else:
+                return "  @ Empty function\n  mov pc, lr\n", data
         else:
             return "", data
 
@@ -279,6 +286,11 @@ def compile_operator(token: parser.OperatorToken, data: AsmData, dst_register="r
         src_condition = f"  sub {dst_register}, r0, r1\n"
     elif type(token.operator) == lexer.AdditionToken:
         src_condition = f"  add {dst_register}, r0, r1\n"
+    elif type(token.operator) == lexer.ModuloToken:
+        # This is cheating, but modulo is complicated.
+        src_condition = f"  bl smickelscript_modulo\n"
+        if dst_register != "r0":
+            src_condition += f"  mov {dst_register}, r0\n"
     elif type(token.operator) == lexer.MultiplicationToken:
         # Destination register **must** be r0 or r1
         if dst_register in ["r0", "r1"]:
@@ -421,6 +433,7 @@ def compile_while(token: parser.WhileStatementToken, data: AsmData):
         src += f"  b {while_label}\n"
         return src, data
     else:
+        line_nr = token.condition.operator.line_nr
         condition_src, data = compile_operator(token.condition, data)
 
         condition_type = type(token.condition.operator)
@@ -428,7 +441,6 @@ def compile_while(token: parser.WhileStatementToken, data: AsmData):
             op = condition_type_map[condition_type]
             src_jump_true = f"  {op} {while_label}\n"
 
-            line_nr = token.condition.operator.line_nr
             src = f"  @ While statement on line {line_nr}\n"
 
             # Check if condition is true before running the body.
@@ -443,7 +455,11 @@ def compile_while(token: parser.WhileStatementToken, data: AsmData):
             src += while_end_label + ":\n"
 
             return src, data
-    raise NotImplementedError()
+    raise NotImplementedError(
+        "Error on line {}. Condition '{}' is not implemented.".format(
+            line_nr, condition_type.__name__
+        )
+    )
 
 
 def compile_assign_var(token: parser.AssignVariableToken, data: AsmData):
@@ -494,6 +510,9 @@ def compile_identifier(token: lexer.IdentifierToken, data: AsmData):
 
 
 def compile_load_var(register, var, data: AsmData):
+    if not hasattr(var, "value"):
+        raise NotImplementedError("Unsupported value.")
+
     # Shitty workaround for immediate values above 255
     if type(var.value) == lexer.NumberLiteralToken and int(var.value.value) > 255:
         return f"  ldr {register}, ={var.value.value}\n", data
@@ -511,18 +530,33 @@ def compile_array_insert(token: parser.ArrayInsertToken, data: AsmData):
     # C example:
     #   r0[r2] = r1
 
-    src_value, data = compile_literal(token.value, data, "r1")
+    # Evaluate the index (inside the array), this can be a number literal, or a calculated value.
+    src, data = compile_token(token.array.index, data)
 
-    src = f"  ldr r0, ={token.array.identifier.value}\n"
-    src += src_value
+    # Multiply by 4 because all arrays have WORD sized elements (aka 4 bytes).
+    src += "  mov r2, #4\n"
+    src += "  mul r2, r0, r2\n"
 
-    if type(token.array.index) == parser.LiteralToken:
-        src += f"  mov r2, #{token.array.index.value.value}\n"
-        # Multiply by 4 because all arrays have WORD sized elements (aka 4 bytes).
-        src += "  lsl r2, r2, #2\n"
-        src += "  str r1, [ r0, r2 ]\n"
+    # Evaluate the value whose result we want to store.
+    # src_value, data = compile_literal(token.value, data, "r1")
+    # src += src_value
+
+    src_value, data = compile_token(token.value, data)
+
+    # Move r2 someplace safe if the src_value touches our r2.
+    if "r2" in src_value:
+        src += "  mov r8, r2\n"
+        src += src_value
+        src += "  mov r2, r8\n"
     else:
-        raise NotImplementedError()
+        src += src_value
+
+    # Move our src_value return value to r1
+    src += "  mov r1, r0\n"
+
+    # Load array ptr and store result at the given offset.
+    src += f"  ldr r0, ={token.array.identifier.value}\n"
+    src += "  str r1, [ r0, r2 ]\n"
 
     dbg = f"  @ Array insertion on line {token.array.identifier.line_nr}\n"
     return dbg + src, data
@@ -532,7 +566,8 @@ def compile_array_access(token: parser.IndexAccessToken, data: AsmData, reg="r0"
     tmp = "r1" if reg != "r1" else "r2"
     src, data = compile_token(token.index, data)
     # Multiply by 4 because all arrays have WORD sized elements (aka 4 bytes).
-    src += "  lsl r0, r0, #2\n"
+    src += f"  mov {tmp}, #4\n"
+    src += f"  mul r0, r0, {tmp}\n"
     src += f"  ldr {tmp}, ={token.identifier.value}\n"
     src += f"  ldr {reg}, [ r0, {tmp} ]\n"
     return src, data
@@ -549,8 +584,18 @@ def get_var_value(token: lexer.ValueToken, data: AsmData):
             return "", f"#{token.value.value}"
         elif type(token.value) == lexer.BoolLiteralToken:
             return "", f"#{1 if token.value.value == 'true' else 0}"
+        elif type(token.value) == lexer.StringLiteralToken:
+            # Unescape values
+            value = bytes(token.value.value, "utf-8").decode("unicode_escape")
+            if len(value) > 1:
+                raise SmickelCompilerException(
+                    "Error on line {}. Only char literals are supported.".format(
+                        token.value.line_nr
+                    )
+                )
+            return "", f"#'{token.value.value}'"
         else:
-            raise NotImplementedError()
+            raise NotImplementedError("Unsupported variable value.")
 
     # This commented out code could be used if we allow parent stack access, which
     # we don't for now.
