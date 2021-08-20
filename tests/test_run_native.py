@@ -3,8 +3,6 @@ from smickelscript.native_helper import assert_environment, run_native
 
 
 def test_println_string_const():
-    assert_environment()
-
     src = """func main() { println_str("Hello World"); }"""
     asm = compile_src(src)
     output = run_native(asm)
@@ -12,8 +10,6 @@ def test_println_string_const():
 
 
 def test_odd_even():
-    assert_environment()
-
     src = """
     func odd(n: number): bool {
         if(n == 0) { return false; }

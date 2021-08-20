@@ -32,6 +32,8 @@ def run_native(code, print_to_stdout=True, log_to_file=True):
             queue.put(line)
         out.close()
 
+    assert_environment()
+
     root = os.path.dirname(os.path.realpath(__file__))
     cwd = os.path.join(root, "..", "native_template")
 

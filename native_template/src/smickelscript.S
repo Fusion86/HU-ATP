@@ -13,7 +13,7 @@ setup:
   mov r4, lr
 
   @ Delay, needed in some cases. I don't really know why though.
-  mov r0, #200
+  mov r0, #250
   bl delay
 
   @ Init serial connection

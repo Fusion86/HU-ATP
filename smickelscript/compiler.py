@@ -509,6 +509,10 @@ def compile_identifier(token: lexer.IdentifierToken, data: AsmData):
     return src + mov, data
 
 
+def compile_comment(token: lexer.CommentToken, data: AsmData):
+    return f"@@@{token.value}\n", data
+
+
 def compile_load_var(register, var, data: AsmData):
     if not hasattr(var, "value"):
         raise NotImplementedError("Unsupported value.")
@@ -629,7 +633,7 @@ token_compilers = {
     parser.WhileStatementToken: compile_while,
     parser.AssignVariableToken: compile_assign_var,
     lexer.IdentifierToken: compile_identifier,
-    lexer.CommentToken: lambda a, b: ("", b),
+    lexer.CommentToken: compile_comment,
     parser.ArrayInsertToken: compile_array_insert,
     parser.IndexAccessToken: compile_array_access,
 }

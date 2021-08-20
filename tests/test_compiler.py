@@ -219,6 +219,18 @@ def test_set_array():
     compile_asm(asm)
 
 
+def test_comments():
+    src = """
+    func main() {
+        # Print Hello World on the next line.
+        // Another comment.
+        println_str("Hello World");
+    }
+    """
+    asm = compile_src(src)
+    compile_asm(asm)
+
+
 def test_array_len():
     src = """
     func array_length() {

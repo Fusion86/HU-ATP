@@ -49,7 +49,16 @@ python -m smickelscript.cli exec -i example/functions.sc -e sommig 5
 
 ## Compiler Usage
 
-Todo...
+```sh
+# Install the package
+pip install -e .
+
+# Compile a script to asm. This prints the generated code to stdout.
+python -m smickelscript.cli native -i example_native/hello_world.sc
+
+# Compile and run a script on an Arduino (connect via usb)
+python -m smickelscript.cli native -i example_native/hello_world.sc --execute
+```
 
 ## About the language
 
@@ -98,7 +107,7 @@ The compiler has a few limitations compared to the interperter:
 - Each element of an array is 4 bytes large. This means that you can't call `print` and `println` on arrays, you can however use `print_int_as_char` to print an integer (element of the array) as an ASCII character.
 - The println function is divided into multiple functions. These functions are `print_integer`, `print_str`, `println_integer`, `println_str`, and `print_int_as_char`.
 - A `bool` type variable is translated into an int `0` or `1` by the compiler, this also means that you have to use either `print_integer` or `println_integer` to print a bool variable.
-- The compiler doesn't do a lot of 'logic checking', this means that usually compiler won't stop you from writing stupid code.
+- The compiler doesn't do a lot of 'logic checking', this means that usually the compiler won't stop you from writing stupid code.
 - You can't access variables in a higher stack layer. `if` and `while` statements do NOT create a new stack layer.
 
 ## Tests
