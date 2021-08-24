@@ -60,6 +60,22 @@ python -m smickelscript.cli native -i example_native/hello_world.sc
 python -m smickelscript.cli native -i example_native/hello_world.sc --execute
 ```
 
+## SmickelScript as a Service Usage
+
+```sh
+# Install the package
+pip install -e .
+pip install Flask flask-cors waitress
+
+# Start web api (development)
+cd smickelscript_web
+flask run
+
+# Start web api (production)
+cd smickelscript_web
+waitress-serve --port=3025 app:app
+```
+
 ## About the language
 
 ### Numbers

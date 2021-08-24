@@ -23,7 +23,7 @@ func main() {
     println_str("Welcome to Conway's Game of Life");
 
     # Change this number here to create other boards.
-    init_board(1);
+    init_board(3);
 
     var step = 0;
     while (step < 16) {

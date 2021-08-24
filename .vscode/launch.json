@@ -13,13 +13,27 @@
       "cwd": "${workspaceFolder}/smickelscript"
     },
     {
-      "name": "CLI",
+      "name": "Python: CLI",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/smickelscript/cli.py",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
-      "args": ["native", "-i", "example_native/functions.sc",]
+      "args": ["native", "-i", "example_native/functions.sc"]
+    },
+    {
+      "name": "Python: SmickelScript WebAPI",
+      "type": "python",
+      "request": "launch",
+      "module": "flask",
+      "env": {
+        "FLASK_APP": "app.py",
+        "FLASK_ENV": "development",
+        "FLASK_DEBUG": "0"
+      },
+      "cwd": "${workspaceFolder}/smickelscript_web",
+      "args": ["run", "--no-debugger", "--no-reload"],
+      "jinja": true
     }
   ]
 }

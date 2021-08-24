@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimal-ui" />
+    <title>SmickelScript as a Service</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.css" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <main class="wrapper">
+      <nav class="navigation">
+        <section class="container">
+          <a class="navigation-title" href="https://milligram.io" title="Milligram - A minimalist CSS framework">
+            <h1 class="title">SmickelScript as a Service</h1>
+          </a>
+        </section>
+      </nav>
+
+      <section class="container" id="contributing">
+        <div class="row">
+          <div class="column">
+            <h3 class="title">SmickelScript Source Code</h3>
+
+            <label for="select-example-code">Example code</label>
+            <select id="select-example-code" onchange="exampleCodeSelectionChanged()"></select>
+
+            <label for="input-textarea">Source code</label>
+            <textarea
+              id="input-textarea"
+              placeholder='Type some code or click "Load Example" to load an example snippet.'
+              rows="30"
+            ></textarea>
+
+            <button class="button" onclick="compileCode()">Compile</button>
+          </div>
+
+          <div class="column">
+            <h3 class="title">Generated ARM Assembler</h3>
+            <p id="status-text"></p>
+            <pre><code id="arm-code-field" class="language-arm" style="display: none;"></code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="index.js"></script>
+  </body>
+</html>
