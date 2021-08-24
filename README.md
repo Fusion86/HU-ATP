@@ -3,6 +3,8 @@
 Crappy programming language made for a school assignment. Heavily influenced by JavaScript/TypeScript.
 We had to use functional functions, which sometimes suck in Python. So the code might not always be readable.
 
+[Try the online compiler!](https://saas.cerbus.nl/)
+
 ## Features
 
 - Five builtin types: number, string, bool, array, and void
@@ -74,6 +76,22 @@ flask run
 # Start web api (production)
 cd smickelscript_web
 waitress-serve --port=3025 app:app
+
+# Example NGINX config
+# server {
+#     listen 443 ssl http2;
+#     listen [::]:443 ssl http2;
+
+#     server_name saas.cerbus.nl;
+
+#     include snippets/ssl-cerbus.conf;
+
+#     root /opt/HU-ATP/smickelscript_web/public/;
+
+#     location /api/ {
+#         proxy_pass http://127.0.0.1:3025/;
+#     }
+# }
 ```
 
 ## About the language
