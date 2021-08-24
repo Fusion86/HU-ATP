@@ -458,6 +458,7 @@ def test_modulo():
     output = run_native(asm)
     assert output == "1\n"
 
+
 def test_array_insert_dynamic_value():
     src = """
     static var a: array[1];
@@ -477,3 +478,43 @@ def test_array_insert_dynamic_value():
     asm = compile_src(src)
     output = run_native(asm)
     assert output == ";\n"
+
+
+def test_local_vars():
+    src = """
+    func main()
+    {
+        sub(10);
+    }
+
+    func sub(a) {
+        var b = 9;
+        var c = 8;
+        var d = 7;
+
+        sub_b(20);
+
+        println_integer(a);
+        println_integer(b);
+        println_integer(c);
+        println_integer(d);
+    }
+
+    func sub_b(a) {
+        var b = 0;
+        var c = 0;
+        var d = 0;
+
+        b = b + 1;
+        c = c + 1;
+        d = d + 1;
+
+        println_integer(a);
+        println_integer(b);
+        println_integer(c);
+        println_integer(d);
+    }
+    """
+    asm = compile_src(src)
+    output = run_native(asm)
+    assert output == "20\n1\n1\n1\n10\n9\n8\n7\n"

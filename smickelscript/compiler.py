@@ -215,14 +215,14 @@ def compile_literal(token: parser.LiteralToken, data: AsmData, register="r0"):
 
 def compile_scope(scope: parser.ScopeWithBody, data: AsmData, create_stack_layer=False, counter=0):
     src = ""
-    pop_src = "  pop { r4, r5, r6, pc }\n"
+    pop_src = "  pop { r3, r4, r5, r6, r7, pc }\n"
 
     if create_stack_layer and counter == 0:
         # Push registers we are not allowed to change to the stack.
         # Also moves the r0 register (function parameter) to the r3 register,
         # we do this because some instructions change the r0 register which
         # would cause us to lose our parameter value.
-        src += "  push { r4, r5, r6, lr }\n  mov r3, r0\n"
+        src += "  push { r3, r4, r5, r6, r7, lr }\n  mov r3, r0\n"
 
     if len(scope.body) <= counter:
         if create_stack_layer:
@@ -310,7 +310,7 @@ def compile_operator(token: parser.OperatorToken, data: AsmData, dst_register="r
 
 def compile_return_statement(token: parser.ReturnToken, data: AsmData):
     src, data = compile_token(token.value, data)
-    return src + "  pop { r4, r5, r6, pc }\n", data
+    return src + "  pop { r3, r4, r5, r6, r7, pc }\n", data
 
 
 def compile_init_var(token: parser.InitVariableToken, data: AsmData):
